@@ -5,11 +5,31 @@
 /c/cygwin/setup.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
 
 
-export PKG_CONFIG_PATH=`pwd`:$PKG_CONFIG_PATH
-PKG_CONFIG_PATH=/home/osch/test/xserver/install/lib/pkgconfig
+cd xextproto
+./autogen.sh -V
+./configure --prefix=`cd ../install; pwd`
+make
+make install
+cd ..
 
-cygwin-configure:
+cd libxfont
+./autogen.sh -V
+./configure --prefix=`cd ../install; pwd` --disable-shared
+make
+make install
+cd ..
 
-./configure --prefix=/usr --with-log-dir=/var/log --enable-debug CFLAGS="-g -O0" --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
+cd install/lib/pkgconfig
+mv xfont.pc xfont.pc.bak
+sed -s 's| -lXfont| ${libdir}/libXfont.a|' xfont.pc.bak > xfont.pc
+cd ../../..
 
+
+#cygwin-configure:
+#./configure --prefix=/usr --with-log-dir=/var/log --enable-debug CFLAGS="-g -O0" --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
+
+cd cygwin
+export PKG_CONFIG_PATH=`cd ../install/lib/pkgconfig; pwd`:$PKG_CONFIG_PATH
+./autogen.sh -V
 ./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
+hw/xwin/XWin :1 -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons
