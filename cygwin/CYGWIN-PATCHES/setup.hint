@@ -1,0 +1,4 @@
+category: X11
+requires: bash libbz2_1 libfontenc1 libfreetype6 libgcc1 libgcrypt11 libGL1 libpixman1_0 libX11_6 libXau6 libXdmcp6 libXext6 xauth xcursor-themes xkbcomp xkeyboard-config zlib0
+sdesc: "X.Org X servers"
+ldesc: "X.Org X servers"
