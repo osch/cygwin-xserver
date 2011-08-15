@@ -3,7 +3,7 @@
 /c/cygwin/setup.exe -q -P bigreqsproto,compositeproto,damageproto,dmxproto,evieext,fixesproto,fontsproto,glproto,inputproto,kbproto,randrproto,recordproto,renderproto,resourceproto,scrnsaverproto,xcmiscproto,xextproto,xineramaproto,xproto,x86bigfontproto
 /c/cygwin/setup.exe -q -P libdmx-devel,libfontenc-devel,libfreetype2-devel,libGL-devel,libpixman1-devel,libX11-devel,libXau-devel,libXaw-devel,libXdmcp-devel,libXext-devel,libXfont-devel,libXinerama-devel,libXmu-devel,libXpm-devel,libXRes-devel,libxkbfile-devel,openssl-devel,zlib
 /c/cygwin/setup.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
-
+/c/cygwin/setup.exe -q -P libgcrypt-devel,libgcrypt
 
 cd xextproto
 ./autogen.sh -V
