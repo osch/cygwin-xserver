@@ -356,6 +356,12 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
   MSG		msgNext;
   LONG		lTime;
   Bool		fReturn;
+  
+  static Bool   hasLastControlL = FALSE;
+  static UINT   lastMessage;
+  static WPARAM lastWparam;
+  static LPARAM lastLparam;
+  static LONG   lastTime;
 
   /*
    * Fake Ctrl_L presses will be followed by an Alt_R keypress
@@ -389,8 +395,21 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 				 WM_KEYDOWN, WM_SYSKEYDOWN,
 				 PM_NOREMOVE);
 	}
-      if (msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
+      if (fReturn && msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
           fReturn = 0;
+
+      if (!fReturn)
+        {
+          hasLastControlL = TRUE;
+          lastMessage = message;
+          lastWparam  = wParam;
+          lastLparam  = lParam;
+          lastTime    = lTime;
+        } 
+      else
+        {
+          hasLastControlL = FALSE;
+        }
 
       /* Is next press an Alt_R with the same timestamp? */
       if (fReturn && msgNext.wParam == VK_MENU
@@ -406,11 +425,33 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 	}
     }
 
+  /*
+   * Check for Alt_R keypress, that was not ready when the
+   * last Ctrl_L appeared.
+   */
+  else if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
+      && wParam == VK_MENU
+      && (HIWORD (lParam) & KF_EXTENDED))
+    {
+      if (hasLastControlL)
+        {
+          lTime = GetMessageTime ();
+          
+          if ((lastMessage == WM_KEYDOWN || lastMessage == WM_SYSKEYDOWN)
+              && lastTime == lTime)
+            {
+                /* take back the fake ctrl_L key */
+                winSendKeyEvent (KEY_LCtrl, FALSE);
+            }
+          hasLastControlL = FALSE;
+        }
+    }
+
   /* 
    * Fake Ctrl_L releases will be followed by an Alt_R release
    * with the same timestamp as the Ctrl_L release.
    */
-  if ((message == WM_KEYUP || message == WM_SYSKEYUP)
+  else if ((message == WM_KEYUP || message == WM_SYSKEYUP)
       && wParam == VK_CONTROL
       && (HIWORD (lParam) & KF_EXTENDED) == 0)
     {
@@ -439,9 +480,11 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 				 PM_NOREMOVE);
 	}
 
-      if (msgNext.message != WM_KEYUP && msgNext.message != WM_SYSKEYUP)
+      if (fReturn && msgNext.message != WM_KEYUP && msgNext.message != WM_SYSKEYUP)
           fReturn = 0;
       
+    hasLastControlL = FALSE;
+
       /* Is next press an Alt_R with the same timestamp? */
       if (fReturn
 	  && (msgNext.message == WM_KEYUP
@@ -457,6 +500,10 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 	   */
 	  return TRUE;
 	}
+    }
+  else
+    {
+      hasLastControlL = FALSE;
     }
   
   /* Not a fake control left press/release */
