@@ -1,0 +1,15 @@
+# install needed cygwin packages:
+/c/cygwin/setup.exe -q -P autoconf,automake,binutils,bison,bzip2,cygport,diffutils,fileutils,findutils,flex,gawk,gcc,git,libtool,make,patch,pkg-config,sed,tar
+/c/cygwin/setup.exe -q -P bigreqsproto,compositeproto,damageproto,dmxproto,evieext,fixesproto,fontsproto,glproto,inputproto,kbproto,randrproto,recordproto,renderproto,resourceproto,scrnsaverproto,xcmiscproto,xextproto,xineramaproto,xproto,x86bigfontproto
+/c/cygwin/setup.exe -q -P libdmx-devel,libfontenc-devel,libfreetype2-devel,libGL-devel,libpixman1-devel,libX11-devel,libXau-devel,libXaw-devel,libXdmcp-devel,libXext-devel,libXfont-devel,libXinerama-devel,libXmu-devel,libXpm-devel,libXRes-devel,libxkbfile-devel,openssl-devel,zlib
+/c/cygwin/setup.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
+
+
+export PKG_CONFIG_PATH=`pwd`:$PKG_CONFIG_PATH
+PKG_CONFIG_PATH=/home/osch/test/xserver/install/lib/pkgconfig
+
+cygwin-configure:
+
+./configure --prefix=/usr --with-log-dir=/var/log --enable-debug CFLAGS="-g -O0" --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
+
+./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
