@@ -255,6 +255,7 @@ void
 winRestoreModeKeyStates (void)
 {
   DWORD			dwKeyState;
+  BOOL			modifierPressed;
   BOOL			processEvents = TRUE;
   unsigned short	internalKeyStates;
 
@@ -281,6 +282,34 @@ winRestoreModeKeyStates (void)
    * a bitwise operator, not a logical operator.  C does not
    * have a logical XOR operator, so we use a macro instead.
    */
+
+  modifierPressed = (GetAsyncKeyState (VK_CONTROL) < 0);
+  if (WIN_XOR (internalKeyStates & ControlMask, modifierPressed))
+    {
+      if (modifierPressed) winSendKeyEvent (KEY_LCtrl, TRUE);
+      else                 winSendKeyEvent (KEY_LCtrl, FALSE);
+    }
+
+  modifierPressed = (GetAsyncKeyState (VK_SHIFT) < 0);
+  if (WIN_XOR (internalKeyStates & ShiftMask, modifierPressed))
+    {
+      if (modifierPressed) winSendKeyEvent (KEY_ShiftL, TRUE);
+      else                 winSendKeyEvent (KEY_ShiftL, FALSE);
+    }
+
+  modifierPressed = (GetAsyncKeyState (VK_LMENU) < 0);
+  if (WIN_XOR (internalKeyStates & Mod1Mask, modifierPressed))
+    {
+      if (modifierPressed) winSendKeyEvent (KEY_Alt, TRUE);
+      else                 winSendKeyEvent (KEY_Alt, FALSE);
+    }
+
+  modifierPressed = (GetAsyncKeyState (VK_RMENU) < 0);
+  if (WIN_XOR (internalKeyStates & Mod5Mask, modifierPressed))
+    {
+      if (modifierPressed) winSendKeyEvent (KEY_AltLang, TRUE);
+      else                 winSendKeyEvent (KEY_AltLang, FALSE);
+    }
 
   /* Has the key state changed? */
   dwKeyState = GetKeyState (VK_NUMLOCK) & 0x0001;
