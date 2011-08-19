@@ -3,7 +3,7 @@
 /c/cygwin/setup.exe -q -P bigreqsproto,compositeproto,damageproto,dmxproto,evieext,fixesproto,fontsproto,glproto,inputproto,kbproto,randrproto,recordproto,renderproto,resourceproto,scrnsaverproto,xcmiscproto,xextproto,xineramaproto,xproto,x86bigfontproto
 /c/cygwin/setup.exe -q -P libdmx-devel,libfontenc-devel,libfreetype2-devel,libGL-devel,libpixman1-devel,libX11-devel,libXau-devel,libXaw-devel,libXdmcp-devel,libXext-devel,libXfont-devel,libXinerama-devel,libXmu-devel,libXpm-devel,libXRes-devel,libxkbfile-devel,openssl-devel,zlib
 /c/cygwin/setup.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
-/c/cygwin/setup.exe -q -P libgcrypt-devel,libgcrypt
+/c/cygwin/setup.exe -q -P libgcrypt-devel,libgcrypt,windowswmproto,font-util
 
 cd xextproto
 ./autogen.sh -V
@@ -32,4 +32,4 @@ cd cygwin
 export PKG_CONFIG_PATH=`cd ../install/lib/pkgconfig; pwd`:$PKG_CONFIG_PATH
 ./autogen.sh -V
 ./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
-hw/xwin/XWin :1 -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons
+hw/xwin/XWin :1 -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons
