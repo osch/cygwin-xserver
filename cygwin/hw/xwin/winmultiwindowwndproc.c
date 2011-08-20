@@ -870,8 +870,7 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
       break;
 
     case WM_MOVE:
-      /* Adjust the X Window to the moved Windows window */
-      winAdjustXWindow (pWin, hwnd);
+      /* Wait for WM_EXITSIZEMOVE */
       return 0;
 
     case WM_SHOWWINDOW:
@@ -1012,6 +1011,11 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
       */
       break; 
 
+    case WM_EXITSIZEMOVE:
+      /* Adjust the X Window to the moved Windows window */
+      winAdjustXWindow (pWin, hwnd);
+      return 0;
+
     case WM_SIZE:
       /* see dix/window.c */
 #if CYGWINDOWING_DEBUG
@@ -1036,9 +1040,12 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
 		(int)(GetTickCount ()));
       }
 #endif
-      /* Adjust the X Window to the moved Windows window */
-      winAdjustXWindow (pWin, hwnd);
-      if (wParam == SIZE_MINIMIZED) winReorderWindowsMultiWindow();
+      if (wParam == SIZE_MINIMIZED) 
+        {
+          winAdjustXWindow (pWin, hwnd);
+          winReorderWindowsMultiWindow();
+        }
+        /* else: normal resize, wait for WM_EXITSIZEMOVE */
       return 0; /* end of WM_SIZE handler */
 
     case WM_STYLECHANGING:
