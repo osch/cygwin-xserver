@@ -321,6 +321,7 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
   static Bool		s_fTracking = FALSE;
   Bool			needRestack = FALSE;
   LRESULT		ret;
+  static Bool           hasEnteredSizeMove = FALSE;
 
 #if CYGDEBUG
   winDebugWin32Message("winTopLevelWindowProc", hwnd, message, wParam, lParam);
@@ -870,7 +871,9 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
       break;
 
     case WM_MOVE:
-      /* Wait for WM_EXITSIZEMOVE */
+      /* Adjust the X Window to the moved Windows window */
+      if (!hasEnteredSizeMove) winAdjustXWindow (pWin, hwnd);
+      /* else: Wait for WM_EXITSIZEMOVE */
       return 0;
 
     case WM_SHOWWINDOW:
@@ -1011,8 +1014,13 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
       */
       break; 
 
+    case WM_ENTERSIZEMOVE:
+      hasEnteredSizeMove = TRUE;
+      return 0;
+
     case WM_EXITSIZEMOVE:
       /* Adjust the X Window to the moved Windows window */
+      hasEnteredSizeMove = FALSE;
       winAdjustXWindow (pWin, hwnd);
       return 0;
 
@@ -1040,12 +1048,13 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
 		(int)(GetTickCount ()));
       }
 #endif
-      if (wParam == SIZE_MINIMIZED) 
+      if (!hasEnteredSizeMove)
         {
+          /* Adjust the X Window to the moved Windows window */
           winAdjustXWindow (pWin, hwnd);
-          winReorderWindowsMultiWindow();
+          if (wParam == SIZE_MINIMIZED) winReorderWindowsMultiWindow();
         }
-        /* else: normal resize, wait for WM_EXITSIZEMOVE */
+        /* else: wait for WM_EXITSIZEMOVE */
       return 0; /* end of WM_SIZE handler */
 
     case WM_STYLECHANGING:
