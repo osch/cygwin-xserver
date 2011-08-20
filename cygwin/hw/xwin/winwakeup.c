@@ -43,6 +43,14 @@ winWakeupHandler (int nScreen,
 		  unsigned long ulResult,
 		  pointer pReadmask)
 {
+    /* was: handleNextWindowMessage, but
+            this will block in WaitForSomething when
+            moving resizing windows in multiwindow 
+            mode. */
+}
+
+void handleNextWindowMessage(void)
+{
   MSG			msg;
 
   /* Process one message from our queue */

@@ -343,33 +343,27 @@ DisableLimitedSchedulingLatency(void)
 
 #define MAJOROP ((xReq *)client->requestBuffer)->reqType
 
-void
-Dispatch(void)
+static     int        *clientReady;     /* array of request ready clients */
+static     int	result;
+static     ClientPtr	client;
+static     int	nready;
+static     HWEventQueuePtr* icheck = checkForInput;
+static     long			start_tick;
+
+int DispatchOneStep(Bool handleWindowMessage)
 {
-    int        *clientReady;     /* array of request ready clients */
-    int	result;
-    ClientPtr	client;
-    int	nready;
-    HWEventQueuePtr* icheck = checkForInput;
-    long			start_tick;
-
-    nextFreeClientID = 1;
-    nClients = 0;
-
-    clientReady = malloc(sizeof(int) * MaxClients);
-    if (!clientReady)
-	return;
-
-    SmartScheduleSlice = SmartScheduleInterval;
-    while (!dispatchException)
-    {
+    int rslt = 0;
+    
         if (*icheck[0] != *icheck[1])
 	{
 	    ProcessInputEvents();
 	    FlushIfCriticalOutputPending();
 	}
-
 	nready = WaitForSomething(clientReady);
+	rslt = nready;
+
+        if (handleWindowMessage)
+            handleNextWindowMessage();
 
 	if (nready && !SmartScheduleDisable)
 	{
@@ -460,6 +454,24 @@ Dispatch(void)
 		client->smart_stop_tick = SmartScheduleTime;
 	}
 	dispatchException &= ~DE_PRIORITYCHANGE;
+
+    return rslt;
+}
+
+void
+Dispatch(void)
+{
+    nextFreeClientID = 1;
+    nClients = 0;
+
+    clientReady = malloc(sizeof(int) * MaxClients);
+    if (!clientReady)
+	return;
+
+    SmartScheduleSlice = SmartScheduleInterval;
+    while (!dispatchException)
+    {
+        DispatchOneStep(TRUE);
     }
 
     if (ddxHooks.ddxBeforeReset)
