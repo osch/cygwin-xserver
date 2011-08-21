@@ -255,7 +255,6 @@ void
 winRestoreModeKeyStates (void)
 {
   DWORD			dwKeyState;
-  BOOL			modifierPressed;
   BOOL			processEvents = TRUE;
   unsigned short	internalKeyStates;
 
@@ -283,33 +282,28 @@ winRestoreModeKeyStates (void)
    * have a logical XOR operator, so we use a macro instead.
    */
 
-  modifierPressed = (GetAsyncKeyState (VK_CONTROL) < 0);
-  if (WIN_XOR (internalKeyStates & ControlMask, modifierPressed))
-    {
-      if (modifierPressed) winSendKeyEvent (KEY_LCtrl, TRUE);
-      else                 winSendKeyEvent (KEY_LCtrl, FALSE);
-    }
+  {
+    /* consider modifer keys */
+    
+    BOOL ctrl   = (GetAsyncKeyState (VK_CONTROL) < 0);
+    BOOL shift  = (GetAsyncKeyState (VK_SHIFT)   < 0);
+    BOOL alt    = (GetAsyncKeyState (VK_LMENU)   < 0);
+    BOOL altgr  = (GetAsyncKeyState (VK_RMENU)   < 0);
 
-  modifierPressed = (GetAsyncKeyState (VK_SHIFT) < 0);
-  if (WIN_XOR (internalKeyStates & ShiftMask, modifierPressed))
-    {
-      if (modifierPressed) winSendKeyEvent (KEY_ShiftL, TRUE);
-      else                 winSendKeyEvent (KEY_ShiftL, FALSE);
-    }
-
-  modifierPressed = (GetAsyncKeyState (VK_LMENU) < 0);
-  if (WIN_XOR (internalKeyStates & Mod1Mask, modifierPressed))
-    {
-      if (modifierPressed) winSendKeyEvent (KEY_Alt, TRUE);
-      else                 winSendKeyEvent (KEY_Alt, FALSE);
-    }
-
-  modifierPressed = (GetAsyncKeyState (VK_RMENU) < 0);
-  if (WIN_XOR (internalKeyStates & Mod5Mask, modifierPressed))
-    {
-      if (modifierPressed) winSendKeyEvent (KEY_AltLang, TRUE);
-      else                 winSendKeyEvent (KEY_AltLang, FALSE);
-    }
+    if (ctrl && altgr) ctrl = FALSE;
+    
+    if (WIN_XOR (internalKeyStates & ControlMask, ctrl))
+      winSendKeyEvent (KEY_LCtrl, ctrl);
+  
+    if (WIN_XOR (internalKeyStates & ShiftMask, shift))
+      winSendKeyEvent (KEY_ShiftL, shift);
+  
+    if (WIN_XOR (internalKeyStates & Mod1Mask, alt))
+      winSendKeyEvent (KEY_Alt, alt);
+  
+    if (WIN_XOR (internalKeyStates & Mod5Mask, altgr))
+      winSendKeyEvent (KEY_AltLang, altgr);
+  }
 
   /* Has the key state changed? */
   dwKeyState = GetKeyState (VK_NUMLOCK) & 0x0001;
