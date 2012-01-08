@@ -1,0 +1,368 @@
+diff --git a/cygwin/dix/dispatch.c b/cygwin/dix/dispatch.c
+index 44f8087..18e9697 100644
+--- a/cygwin/dix/dispatch.c
++++ b/cygwin/dix/dispatch.c
+@@ -343,33 +343,27 @@ DisableLimitedSchedulingLatency(void)
+ 
+ #define MAJOROP ((xReq *)client->requestBuffer)->reqType
+ 
+-void
+-Dispatch(void)
+-{
+-    int        *clientReady;     /* array of request ready clients */
+-    int	result;
+-    ClientPtr	client;
+-    int	nready;
+-    HWEventQueuePtr* icheck = checkForInput;
+-    long			start_tick;
++static     int        *clientReady;     /* array of request ready clients */
++static     int	result;
++static     ClientPtr	client;
++static     int	nready;
++static     HWEventQueuePtr* icheck = checkForInput;
++static     long			start_tick;
+ 
+-    nextFreeClientID = 1;
+-    nClients = 0;
+-
+-    clientReady = malloc(sizeof(int) * MaxClients);
+-    if (!clientReady)
+-	return;
+-
+-    SmartScheduleSlice = SmartScheduleInterval;
+-    while (!dispatchException)
+-    {
++int DispatchOneStep(Bool handleWindowMessage)
++{
++    int rslt = 0;
++    
+         if (*icheck[0] != *icheck[1])
+ 	{
+ 	    ProcessInputEvents();
+ 	    FlushIfCriticalOutputPending();
+ 	}
+-
+ 	nready = WaitForSomething(clientReady);
++	rslt = nready;
++
++        if (handleWindowMessage)
++            handleNextWindowMessage();
+ 
+ 	if (nready && !SmartScheduleDisable)
+ 	{
+@@ -460,6 +454,24 @@ Dispatch(void)
+ 		client->smart_stop_tick = SmartScheduleTime;
+ 	}
+ 	dispatchException &= ~DE_PRIORITYCHANGE;
++
++    return rslt;
++}
++
++void
++Dispatch(void)
++{
++    nextFreeClientID = 1;
++    nClients = 0;
++
++    clientReady = malloc(sizeof(int) * MaxClients);
++    if (!clientReady)
++	return;
++
++    SmartScheduleSlice = SmartScheduleInterval;
++    while (!dispatchException)
++    {
++        DispatchOneStep(TRUE);
+     }
+ 
+     if (ddxHooks.ddxBeforeReset)
+diff --git a/cygwin/hw/xwin/winkeybd.c b/cygwin/hw/xwin/winkeybd.c
+index 9e5a9b0..99c822d 100644
+--- a/cygwin/hw/xwin/winkeybd.c
++++ b/cygwin/hw/xwin/winkeybd.c
+@@ -282,6 +282,29 @@ winRestoreModeKeyStates (void)
+    * have a logical XOR operator, so we use a macro instead.
+    */
+ 
++  {
++    /* consider modifer keys */
++    
++    BOOL ctrl   = (GetAsyncKeyState (VK_CONTROL) < 0);
++    BOOL shift  = (GetAsyncKeyState (VK_SHIFT)   < 0);
++    BOOL alt    = (GetAsyncKeyState (VK_LMENU)   < 0);
++    BOOL altgr  = (GetAsyncKeyState (VK_RMENU)   < 0);
++
++    if (ctrl && altgr) ctrl = FALSE;
++    
++    if (WIN_XOR (internalKeyStates & ControlMask, ctrl))
++      winSendKeyEvent (KEY_LCtrl, ctrl);
++  
++    if (WIN_XOR (internalKeyStates & ShiftMask, shift))
++      winSendKeyEvent (KEY_ShiftL, shift);
++  
++    if (WIN_XOR (internalKeyStates & Mod1Mask, alt))
++      winSendKeyEvent (KEY_Alt, alt);
++  
++    if (WIN_XOR (internalKeyStates & Mod5Mask, altgr))
++      winSendKeyEvent (KEY_AltLang, altgr);
++  }
++
+   /* Has the key state changed? */
+   dwKeyState = GetKeyState (VK_NUMLOCK) & 0x0001;
+   if (WIN_XOR (internalKeyStates & NumLockMask, dwKeyState))
+@@ -327,6 +350,12 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
+   MSG		msgNext;
+   LONG		lTime;
+   Bool		fReturn;
++  
++  static Bool   hasLastControlL = FALSE;
++  static UINT   lastMessage;
++  static WPARAM lastWparam;
++  static LPARAM lastLparam;
++  static LONG   lastTime;
+ 
+   /*
+    * Fake Ctrl_L presses will be followed by an Alt_R keypress
+@@ -360,9 +389,22 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
+ 				 WM_KEYDOWN, WM_SYSKEYDOWN,
+ 				 PM_NOREMOVE);
+ 	}
+-      if (msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
++      if (fReturn && msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
+           fReturn = 0;
+ 
++      if (!fReturn)
++        {
++          hasLastControlL = TRUE;
++          lastMessage = message;
++          lastWparam  = wParam;
++          lastLparam  = lParam;
++          lastTime    = lTime;
++        } 
++      else
++        {
++          hasLastControlL = FALSE;
++        }
++
+       /* Is next press an Alt_R with the same timestamp? */
+       if (fReturn && msgNext.wParam == VK_MENU
+ 	  && msgNext.time == lTime
+@@ -377,11 +419,33 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
+ 	}
+     }
+ 
++  /*
++   * Check for Alt_R keypress, that was not ready when the
++   * last Ctrl_L appeared.
++   */
++  else if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
++      && wParam == VK_MENU
++      && (HIWORD (lParam) & KF_EXTENDED))
++    {
++      if (hasLastControlL)
++        {
++          lTime = GetMessageTime ();
++          
++          if ((lastMessage == WM_KEYDOWN || lastMessage == WM_SYSKEYDOWN)
++              && lastTime == lTime)
++            {
++                /* take back the fake ctrl_L key */
++                winSendKeyEvent (KEY_LCtrl, FALSE);
++            }
++          hasLastControlL = FALSE;
++        }
++    }
++
+   /* 
+    * Fake Ctrl_L releases will be followed by an Alt_R release
+    * with the same timestamp as the Ctrl_L release.
+    */
+-  if ((message == WM_KEYUP || message == WM_SYSKEYUP)
++  else if ((message == WM_KEYUP || message == WM_SYSKEYUP)
+       && wParam == VK_CONTROL
+       && (HIWORD (lParam) & KF_EXTENDED) == 0)
+     {
+@@ -410,9 +474,11 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
+ 				 PM_NOREMOVE);
+ 	}
+ 
+-      if (msgNext.message != WM_KEYUP && msgNext.message != WM_SYSKEYUP)
++      if (fReturn && msgNext.message != WM_KEYUP && msgNext.message != WM_SYSKEYUP)
+           fReturn = 0;
+       
++    hasLastControlL = FALSE;
++
+       /* Is next press an Alt_R with the same timestamp? */
+       if (fReturn
+ 	  && (msgNext.message == WM_KEYUP
+@@ -429,6 +495,10 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
+ 	  return TRUE;
+ 	}
+     }
++  else
++    {
++      hasLastControlL = FALSE;
++    }
+   
+   /* Not a fake control left press/release */
+   return FALSE;
+diff --git a/cygwin/hw/xwin/winmultiwindowwindow.c b/cygwin/hw/xwin/winmultiwindowwindow.c
+index 956a9a5..123533b 100644
+--- a/cygwin/hw/xwin/winmultiwindowwindow.c
++++ b/cygwin/hw/xwin/winmultiwindowwindow.c
+@@ -465,6 +465,7 @@ winRestackWindowMultiWindow (WindowPtr pWin, WindowPtr pOldNextSib)
+   HWND			hInsertAfter;
+   HWND                  hWnd = NULL;
+ #endif
++  static Bool fRestacking = FALSE; /* Avoid recusive calls to this function */
+   ScreenPtr		pScreen = pWin->drawable.pScreen;
+   winScreenPriv(pScreen);
+ 
+@@ -472,10 +473,27 @@ winRestackWindowMultiWindow (WindowPtr pWin, WindowPtr pOldNextSib)
+   winTrace ("winRestackMultiWindow - %08x\n", pWin);
+ #endif
+   
++  if (fRestacking)
++    {
++      /* It is a recusive call so immediately exit */
++#if CYGWINDOWING_DEBUG
++      ErrorF ("winRestackWindowMultiWindow - "
++	      "exit because fRestacking == TRUE\n");
++#endif
++      return;
++    }
++  fRestacking = TRUE;
++
+    WIN_UNWRAP(RestackWindow);
+    if (pScreen->RestackWindow) 
+      (*pScreen->RestackWindow)(pWin, pOldNextSib);
+    WIN_WRAP(RestackWindow, winRestackWindowMultiWindow);
++
++  if (pWin->realized && pWin->prevSib == NULL && isToplevelWindow(pWin))
++    {
++      winWindowPriv(pWin);
++      SetForegroundWindow(pWinPriv->hWnd);
++    }
+   
+ #if 1
+   /*
+@@ -538,6 +556,8 @@ winRestackWindowMultiWindow (WindowPtr pWin, WindowPtr pOldNextSib)
+ 		0, 0,
+ 		uFlags);
+ #endif
++
++  fRestacking = FALSE;
+ }
+ 
+ static void
+diff --git a/cygwin/hw/xwin/winmultiwindowwndproc.c b/cygwin/hw/xwin/winmultiwindowwndproc.c
+index bd84c05..265fdcc 100644
+--- a/cygwin/hw/xwin/winmultiwindowwndproc.c
++++ b/cygwin/hw/xwin/winmultiwindowwndproc.c
+@@ -321,6 +321,7 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
+   static Bool		s_fTracking = FALSE;
+   Bool			needRestack = FALSE;
+   LRESULT		ret;
++  static Bool           hasEnteredSizeMove = FALSE;
+ 
+ #if CYGDEBUG
+   winDebugWin32Message("winTopLevelWindowProc", hwnd, message, wParam, lParam);
+@@ -871,7 +872,15 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
+ 
+     case WM_MOVE:
+       /* Adjust the X Window to the moved Windows window */
+-      winAdjustXWindow (pWin, hwnd);
++      if (!hasEnteredSizeMove) 
++        {
++          winAdjustXWindow (pWin, hwnd);
++        }
++      else
++        {
++          winAdjustXWindow (pWin, hwnd);
++          while (DispatchOneStep(FALSE) > 0) {}
++        }
+       return 0;
+ 
+     case WM_SHOWWINDOW:
+@@ -1012,6 +1021,16 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
+       */
+       break; 
+ 
++    case WM_ENTERSIZEMOVE:
++      hasEnteredSizeMove = TRUE;
++      return 0;
++
++    case WM_EXITSIZEMOVE:
++      /* Adjust the X Window to the moved Windows window */
++      hasEnteredSizeMove = FALSE;
++      winAdjustXWindow (pWin, hwnd);
++      return 0;
++
+     case WM_SIZE:
+       /* see dix/window.c */
+ #if CYGWINDOWING_DEBUG
+@@ -1036,9 +1055,17 @@ winTopLevelWindowProc (HWND hwnd, UINT message,
+ 		(int)(GetTickCount ()));
+       }
+ #endif
+-      /* Adjust the X Window to the moved Windows window */
+-      winAdjustXWindow (pWin, hwnd);
+-      if (wParam == SIZE_MINIMIZED) winReorderWindowsMultiWindow();
++      if (!hasEnteredSizeMove)
++        {
++          /* Adjust the X Window to the moved Windows window */
++          winAdjustXWindow (pWin, hwnd);
++          if (wParam == SIZE_MINIMIZED) winReorderWindowsMultiWindow();
++        }
++      else
++        {
++          winAdjustXWindow (pWin, hwnd);
++          while (DispatchOneStep(FALSE) > 0) {}
++        }
+       return 0; /* end of WM_SIZE handler */
+ 
+     case WM_STYLECHANGING:
+diff --git a/cygwin/hw/xwin/winwakeup.c b/cygwin/hw/xwin/winwakeup.c
+index 031a510..6eab76a 100644
+--- a/cygwin/hw/xwin/winwakeup.c
++++ b/cygwin/hw/xwin/winwakeup.c
+@@ -43,6 +43,14 @@ winWakeupHandler (int nScreen,
+ 		  unsigned long ulResult,
+ 		  pointer pReadmask)
+ {
++    /* was: handleNextWindowMessage, but
++            this will block in WaitForSomething when
++            moving resizing windows in multiwindow 
++            mode. */
++}
++
++void handleNextWindowMessage(void)
++{
+   MSG			msg;
+ 
+   /* Process one message from our queue */
+diff --git a/cygwin/hw/xwin/winwndproc.c b/cygwin/hw/xwin/winwndproc.c
+index 316cf08..7de5a5d 100644
+--- a/cygwin/hw/xwin/winwndproc.c
++++ b/cygwin/hw/xwin/winwndproc.c
+@@ -1060,6 +1060,10 @@ winWindowProc (HWND hwnd, UINT message,
+       if ((wParam == VK_LWIN || wParam == VK_RWIN) && !g_fKeyboardHookLL)
+ 	break;
+ 
++      /* Discard fake Ctrl_L presses that precede AltGR on non-US keyboards */
++      if (winIsFakeCtrl_L (message, wParam, lParam))
++	return 0;
++      
+       /* 
+        * Discard presses generated from Windows auto-repeat
+        */
+@@ -1080,10 +1084,6 @@ winWindowProc (HWND hwnd, UINT message,
+         }
+       } 
+       
+-      /* Discard fake Ctrl_L presses that precede AltGR on non-US keyboards */
+-      if (winIsFakeCtrl_L (message, wParam, lParam))
+-	return 0;
+-      
+       /* Translate Windows key code to X scan code */
+       winTranslateKey (wParam, lParam, &iScanCode);
+ 

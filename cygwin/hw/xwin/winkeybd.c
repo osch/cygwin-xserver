@@ -41,6 +41,7 @@
 #include "winmsg.h"
 
 #include "xkbsrv.h"
+#include "dixgrabs.h"
 
 static Bool g_winKeyState[NUM_KEYCODES];
 
@@ -351,14 +352,12 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
   LONG		lTime;
   Bool		fReturn;
   
-  static Bool   hasLastControlL = FALSE;
+  static Bool   lastWasControlL = FALSE;
   static UINT   lastMessage;
-  static WPARAM lastWparam;
-  static LPARAM lastLparam;
   static LONG   lastTime;
 
   /*
-   * Fake Ctrl_L presses will be followed by an Alt_R keypress
+   * Fake Ctrl_L presses will be followed by an Alt_R press
    * with the same timestamp as the Ctrl_L press.
    */
   if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
@@ -370,39 +369,23 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
       /* Get time of current message */
       lTime = GetMessageTime ();
 
-      /* Look for fake Ctrl_L preceeding an Alt_R press. */
+      /* Look for next press message */
       fReturn = PeekMessage (&msgNext, NULL,
 			     WM_KEYDOWN, WM_SYSKEYDOWN,
 			     PM_NOREMOVE);
 
-      /*
-       * Try again if the first call fails.
-       * NOTE: This usually happens when TweakUI is enabled.
-       */
-      if (!fReturn)
-	{
-	  /* Voodoo to make sure that the Alt_R message has posted */
-	  Sleep (0);
-
-	  /* Look for fake Ctrl_L preceeding an Alt_R press. */
-	  fReturn = PeekMessage (&msgNext, NULL,
-				 WM_KEYDOWN, WM_SYSKEYDOWN,
-				 PM_NOREMOVE);
-	}
-      if (fReturn && msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
+      if (fReturn &&  msgNext.message != WM_KEYDOWN && msgNext.message != WM_SYSKEYDOWN)
           fReturn = 0;
 
       if (!fReturn)
         {
-          hasLastControlL = TRUE;
+          lastWasControlL = TRUE;
           lastMessage = message;
-          lastWparam  = wParam;
-          lastLparam  = lParam;
-          lastTime    = lTime;
-        } 
+          lastTime = lTime;
+        }
       else
         {
-          hasLastControlL = FALSE;
+          lastWasControlL = FALSE;
         }
 
       /* Is next press an Alt_R with the same timestamp? */
@@ -410,7 +393,7 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 	  && msgNext.time == lTime
 	  && (HIWORD (msgNext.lParam) & KF_EXTENDED))
 	{
-	  /* 
+	  /*
 	   * Next key press is Alt_R with same timestamp as current
 	   * Ctrl_L message.  Therefore, this Ctrl_L press is a fake
 	   * event, so discard it.
@@ -418,30 +401,31 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
 	  return TRUE;
 	}
     }
-
   /*
-   * Check for Alt_R keypress, that was not ready when the
-   * last Ctrl_L appeared.
+   * Sometimes, the Alt_R press message is not yet posted when the
+   * fake Ctrl_L press message arrives (even though it has the
+   * same timestamp), so check for an Alt_R press message that has
+   * arrived since the last Ctrl_L message.
    */
   else if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
       && wParam == VK_MENU
       && (HIWORD (lParam) & KF_EXTENDED))
     {
-      if (hasLastControlL)
+      /* Got a Alt_R press */
+
+      if (lastWasControlL)
         {
           lTime = GetMessageTime ();
-          
-          if ((lastMessage == WM_KEYDOWN || lastMessage == WM_SYSKEYDOWN)
-              && lastTime == lTime)
+
+          if (lastTime == lTime)
             {
-                /* take back the fake ctrl_L key */
+                /* Undo the fake Ctrl_L press by sending a fake Ctrl_L release */
                 winSendKeyEvent (KEY_LCtrl, FALSE);
             }
-          hasLastControlL = FALSE;
+          lastWasControlL = FALSE;
         }
     }
-
-  /* 
+  /*
    * Fake Ctrl_L releases will be followed by an Alt_R release
    * with the same timestamp as the Ctrl_L release.
    */
@@ -454,30 +438,15 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
       /* Get time of current message */
       lTime = GetMessageTime ();
 
-      /* Look for fake Ctrl_L release preceeding an Alt_R release. */
+      /* Look for next release message */
       fReturn = PeekMessage (&msgNext, NULL,
-			     WM_KEYUP, WM_SYSKEYUP, 
+			     WM_KEYUP, WM_SYSKEYUP,
 			     PM_NOREMOVE);
-
-      /*
-       * Try again if the first call fails.
-       * NOTE: This usually happens when TweakUI is enabled.
-       */
-      if (!fReturn)
-	{
-	  /* Voodoo to make sure that the Alt_R message has posted */
-	  Sleep (0);
-
-	  /* Look for fake Ctrl_L release preceeding an Alt_R release. */
-	  fReturn = PeekMessage (&msgNext, NULL,
-				 WM_KEYUP, WM_SYSKEYUP, 
-				 PM_NOREMOVE);
-	}
 
       if (fReturn && msgNext.message != WM_KEYUP && msgNext.message != WM_SYSKEYUP)
           fReturn = 0;
-      
-    hasLastControlL = FALSE;
+
+      lastWasControlL = FALSE;
 
       /* Is next press an Alt_R with the same timestamp? */
       if (fReturn
@@ -497,9 +466,11 @@ winIsFakeCtrl_L (UINT message, WPARAM wParam, LPARAM lParam)
     }
   else
     {
-      hasLastControlL = FALSE;
+      /* On any other press or release message, we don't have a
+         potentially fake Ctrl_L to worry about anymore... */
+      lastWasControlL = FALSE;
     }
-  
+
   /* Not a fake control left press/release */
   return FALSE;
 }
@@ -542,9 +513,6 @@ winKeybdReleaseKeys (void)
 void
 winSendKeyEvent (DWORD dwKey, Bool fDown)
 {
-  EventListPtr events;
-  int i, nevents;
-
   /*
    * When alt-tabing between screens we can get phantom key up messages
    * Here we only pass them through it we think we should!
@@ -554,14 +522,10 @@ winSendKeyEvent (DWORD dwKey, Bool fDown)
   /* Update the keyState map */
   g_winKeyState[dwKey] = fDown;
 
-  GetEventList(&events);
-  nevents = GetKeyboardEvents(events, g_pwinKeyboard, fDown ? KeyPress : KeyRelease, dwKey + MIN_KEYCODE);
+  QueueKeyboardEvents(g_pwinKeyboard, fDown ? KeyPress : KeyRelease, dwKey + MIN_KEYCODE, NULL);
 
-  for (i = 0; i < nevents; i++)
-    mieqEnqueue(g_pwinKeyboard, (InternalEvent*)events[i].event);
-
-  winDebug("winSendKeyEvent: dwKey: %d, fDown: %d, nEvents %d\n",
-           dwKey, fDown, nevents);
+  winDebug("winSendKeyEvent: dwKey: %d, fDown: %d\n",
+           dwKey, fDown);
 }
 
 BOOL winCheckKeyPressed(WPARAM wParam, LPARAM lParam)
@@ -598,4 +562,35 @@ void winFixShiftKeys (int iScanCode)
     winSendKeyEvent (KEY_ShiftR, FALSE);
   if (iScanCode == KEY_ShiftR && g_winKeyState[KEY_ShiftL])
     winSendKeyEvent (KEY_ShiftL, FALSE);
+}
+
+/*
+ */
+int
+XkbDDXPrivate(DeviceIntPtr dev,KeyCode key,XkbAction *act)
+{
+    XkbAnyAction *xf86act = &(act->any);
+    char msgbuf[XkbAnyActionDataSize+1];
+
+    if (xf86act->type == XkbSA_XFree86Private)
+      {
+        memcpy(msgbuf, xf86act->data, XkbAnyActionDataSize);
+        msgbuf[XkbAnyActionDataSize]= '\0';
+        if (strcasecmp(msgbuf, "prgrbs")==0) {
+            DeviceIntPtr tmp;
+            winMsg(X_INFO, "Printing all currently active device grabs:\n");
+            for (tmp = inputInfo.devices; tmp; tmp = tmp->next)
+                if (tmp->deviceGrab.grab)
+                    PrintDeviceGrabInfo(tmp);
+            winMsg(X_INFO, "End list of active device grabs\n");
+        }
+        else if (strcasecmp(msgbuf, "ungrab")==0)
+            UngrabAllDevices(FALSE);
+        else if (strcasecmp(msgbuf, "clsgrb")==0)
+            UngrabAllDevices(TRUE);
+        else if (strcasecmp(msgbuf, "prwins")==0)
+            PrintWindowTree();
+    }
+
+    return 0;
 }

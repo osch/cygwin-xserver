@@ -112,7 +112,7 @@ OsVendorFatalError (void)
     g_fLogInited = TRUE;
     g_pszLogFile = LogInit (g_pszLogFile, NULL);
   }
-  LogClose ();
+  LogClose (EXIT_ERR_ABORT);
 
   /*
      Sometimes the error message we capture in lastError

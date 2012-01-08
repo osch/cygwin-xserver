@@ -104,6 +104,7 @@ Equipment Corporation.
 #include "extnsionst.h"
 #include "privates.h"
 #include "registry.h"
+#include "client.h"
 #ifdef PANORAMIX
 #include "panoramiXsrv.h"
 #else
@@ -141,8 +142,6 @@ int main(int argc, char *argv[], char *envp[])
 #endif
 
     InitRegions();
-
-    pixman_disable_out_of_bounds_workaround();
 
     CheckUserParameters(argc, argv, envp);
 
@@ -265,6 +264,7 @@ int main(int argc, char *argv[], char *envp[])
         InitCoreDevices();
 	InitInput(argc, argv);
 	InitAndStartDevices();
+	ReserveClientIds(serverClient);
 
 	dixSaveScreens(serverClient, SCREEN_SAVER_FORCER, ScreenSaverReset);
 
@@ -337,6 +337,7 @@ int main(int argc, char *argv[], char *envp[])
 	    screenInfo.numScreens = i;
 	}
 
+	ReleaseClientIds(serverClient);
 	dixFreePrivates(serverClient->devPrivates, PRIVATE_CLIENT);
 	serverClient->devPrivates = NULL;
 
@@ -353,7 +354,7 @@ int main(int argc, char *argv[], char *envp[])
 
 	if (dispatchException & DE_TERMINATE)
 	{
-	    ddxGiveUp();
+	    ddxGiveUp(EXIT_NO_ERROR);
 	    break;
 	}
 

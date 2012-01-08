@@ -62,10 +62,11 @@ SOFTWARE.
 #define DEVICE_OFF	2
 #define DEVICE_CLOSE	3
 
-#define POINTER_RELATIVE (1 << 1)
-#define POINTER_ABSOLUTE (1 << 2)
-#define POINTER_ACCELERATE (1 << 3)
-#define POINTER_SCREEN (1 << 4) /* Data in screen coordinates */
+#define POINTER_RELATIVE	(1 << 1)
+#define POINTER_ABSOLUTE	(1 << 2)
+#define POINTER_ACCELERATE	(1 << 3)
+#define POINTER_SCREEN		(1 << 4)	/* Data in screen coordinates */
+#define POINTER_NORAW		(1 << 5)	/* Don't generate RawEvents */
 
 /*int constants for pointer acceleration schemes*/
 #define PtrAccelNoOp            0
@@ -107,19 +108,10 @@ typedef struct _ClassesRec *ClassesPtr;
 typedef struct _SpriteRec *SpritePtr;
 typedef union _GrabMask GrabMask;
 
-typedef struct _EventList {
-    xEvent* event;
-    int evlen; /* length of allocated memory for event in bytes.  This is not
-                  the actual length of the event. The event's actual length is
-                  32 for standard events or 32 +
-                  ((xGenericEvent*)event)->length * 4 for GenericEvents.
-                  For events in the EQ, the length is
-                  ((InternalEvent*)event)->u.any.length */
-} EventList, *EventListPtr;
+typedef struct _ValuatorMask ValuatorMask;
 
 /* The DIX stores incoming input events in this list */
-extern EventListPtr InputEventList;
-extern int InputEventListLen;
+extern InternalEvent* InputEventList;
 
 typedef int (*DeviceProc)(
     DeviceIntPtr /*device*/,
@@ -142,14 +134,17 @@ typedef void (*DeviceUnwrapProc)(
 
 /* pointer acceleration handling */
 typedef void (*PointerAccelSchemeProc)(
-    DeviceIntPtr /*pDev*/,
-    int /*first_valuator*/,
-    int /*num_valuators*/,
-    int* /*valuators*/,
-    int /*evtime*/);
+    DeviceIntPtr /*device*/,
+    ValuatorMask* /*valuators*/,
+    CARD32 /*evtime*/);
 
 typedef void (*DeviceCallbackProc)(
               DeviceIntPtr /*pDev*/);
+
+struct _ValuatorAccelerationRec;
+typedef Bool (*PointerAccelSchemeInitProc)(
+              DeviceIntPtr /*dev*/,
+              struct _ValuatorAccelerationRec* /*protoScheme*/);
 
 typedef struct _DeviceRec {
     pointer	devicePrivate;
@@ -158,8 +153,6 @@ typedef struct _DeviceRec {
     ProcessInputProc enqueueInputProc;	/* enqueue */
     Bool	on;			/* used by DDX to keep state */
 } DeviceRec, *DevicePtr;
-
-typedef struct _ValuatorMask ValuatorMask;
 
 typedef struct {
     int			click, bell, bell_pitch, bell_duration;
@@ -313,9 +306,6 @@ extern _X_EXPORT Bool InitPointerAccelerationScheme(
     DeviceIntPtr /*dev*/,
     int /*scheme*/);
 
-extern _X_EXPORT Bool InitAbsoluteClassDeviceStruct(
-    DeviceIntPtr /*device*/);
-
 extern _X_EXPORT Bool InitFocusClassDeviceStruct(
     DeviceIntPtr /*device*/);
 
@@ -433,22 +423,28 @@ extern _X_EXPORT void CloseInput(void);
 
 extern _X_EXPORT int GetMaximumEventsNum(void);
 
-extern _X_EXPORT int GetEventList(EventListPtr* list);
-extern _X_EXPORT EventListPtr InitEventList(int num_events);
-extern _X_EXPORT void FreeEventList(EventListPtr list, int num_events);
+extern _X_EXPORT InternalEvent *InitEventList(int num_events);
+extern _X_EXPORT void FreeEventList(InternalEvent *list, int num_events);
 
-extern void CreateClassesChangedEvent(EventListPtr event,
+extern void CreateClassesChangedEvent(InternalEvent *event,
                                       DeviceIntPtr master,
                                       DeviceIntPtr slave,
                                       int type);
-extern EventListPtr UpdateFromMaster(
-    EventListPtr events,
+extern InternalEvent * UpdateFromMaster(
+    InternalEvent *events,
     DeviceIntPtr pDev,
     int type,
     int *num_events);
 
 extern _X_EXPORT int GetPointerEvents(
-    EventListPtr events,
+    InternalEvent *events,
+    DeviceIntPtr pDev,
+    int type,
+    int buttons,
+    int flags,
+    const ValuatorMask *mask);
+
+extern _X_EXPORT void QueuePointerEvents(
     DeviceIntPtr pDev,
     int type,
     int buttons,
@@ -456,20 +452,25 @@ extern _X_EXPORT int GetPointerEvents(
     const ValuatorMask *mask);
 
 extern _X_EXPORT int GetKeyboardEvents(
-    EventListPtr events,
-    DeviceIntPtr pDev,
-    int type,
-    int key_code);
-
-extern int GetKeyboardValuatorEvents(
-    EventListPtr events,
+    InternalEvent *events,
     DeviceIntPtr pDev,
     int type,
     int key_code,
     const ValuatorMask *mask);
 
-extern int GetProximityEvents(
-    EventListPtr events,
+extern _X_EXPORT void QueueKeyboardEvents(
+    DeviceIntPtr pDev,
+    int type,
+    int key_code,
+    const ValuatorMask *mask);
+
+extern _X_EXPORT int GetProximityEvents(
+    InternalEvent *events,
+    DeviceIntPtr pDev,
+    int type,
+    const ValuatorMask *mask);
+
+extern _X_EXPORT void QueueProximityEvents(
     DeviceIntPtr pDev,
     int type,
     const ValuatorMask *mask);
@@ -545,14 +546,15 @@ extern WindowPtr XYToWindow(SpritePtr pSprite, int x, int y);
 extern int EventIsDeliverable(DeviceIntPtr dev, InternalEvent* event,
                               WindowPtr win);
 /**
- * Return masks for EventIsDeliverable.
+ * Masks specifying the type of event to deliver for an InternalEvent; used
+ * by EventIsDeliverable.
  * @defgroup EventIsDeliverable return flags
  * @{
  */
-#define XI_MASK                 (1 << 0) /**< XI mask set on window */
-#define CORE_MASK               (1 << 1) /**< Core mask set on window */
-#define DONT_PROPAGATE_MASK     (1 << 2) /**< DontPropagate mask set on window */
-#define XI2_MASK                (1 << 3) /**< XI2 mask set on window */
+#define EVENT_XI1_MASK                (1 << 0) /**< XI1.x event */
+#define EVENT_CORE_MASK               (1 << 1) /**< Core event */
+#define EVENT_DONT_PROPAGATE_MASK     (1 << 2) /**< DontPropagate mask set */
+#define EVENT_XI2_MASK                (1 << 3) /**< XI2 mask set on window */
 /* @} */
 
 /* Implemented by the DDX. */

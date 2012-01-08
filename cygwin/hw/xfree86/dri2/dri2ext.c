@@ -50,6 +50,7 @@
 #include "xf86Module.h"
 
 static ExtensionEntry	*dri2Extension;
+extern Bool DRI2ModuleSetup(void);
 
 static Bool
 validDrawable(ClientPtr client, XID drawable, Mask access_mode,
@@ -357,9 +358,9 @@ vals_to_card64(CARD32 lo, CARD32 hi)
 
 static void
 DRI2SwapEvent(ClientPtr client, void *data, int type, CARD64 ust, CARD64 msc,
-	      CARD64 sbc)
+	      CARD32 sbc)
 {
-    xDRI2BufferSwapComplete event;
+    xDRI2BufferSwapComplete2 event;
     DrawablePtr pDrawable = data;
 
     event.type = DRI2EventBase + DRI2_BufferSwapComplete;
@@ -369,8 +370,7 @@ DRI2SwapEvent(ClientPtr client, void *data, int type, CARD64 ust, CARD64 msc,
     event.ust_lo = ust & 0xffffffff;
     event.msc_hi = (CARD64)msc >> 32;
     event.msc_lo = msc & 0xffffffff;
-    event.sbc_hi = (CARD64)sbc >> 32;
-    event.sbc_lo = sbc & 0xffffffff;
+    event.sbc = sbc;
 
     WriteEventsToClient(client, 1, (xEvent *)&event);
 }
@@ -637,6 +637,8 @@ DRI2ExtensionInit(void)
 				 StandardMinorOpcode);
 
     DRI2EventBase = dri2Extension->eventBase;
+
+    DRI2ModuleSetup();
 }
 
 extern Bool noDRI2Extension;

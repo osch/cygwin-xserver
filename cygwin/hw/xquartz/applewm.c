@@ -437,7 +437,7 @@ ProcAppleWMSetWindowLevel(register ClientPtr client)
 				   DixReadAccess))
         return BadValue;
 
-    if (stuff->level < 0 || stuff->level >= AppleWMNumWindowLevels) {
+    if (stuff->level >= AppleWMNumWindowLevels) {
         return BadValue;
     }
 
@@ -727,10 +727,12 @@ AppleWMExtensionInit(
                                  NULL,
                                  StandardMinorOpcode)))
     {
+        size_t i;
         WMReqCode = (unsigned char)extEntry->base;
         WMErrorBase = extEntry->errorBase;
         WMEventBase = extEntry->eventBase;
-        EventSwapVector[WMEventBase] = (EventSwapPtr) SNotifyEvent;
+        for (i=0; i < AppleWMNumberEvents; i++)
+            EventSwapVector[WMEventBase + i] = (EventSwapPtr) SNotifyEvent;
         appleWMProcs = procsPtr;
     }
 }

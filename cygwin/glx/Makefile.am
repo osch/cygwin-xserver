@@ -11,7 +11,6 @@ AM_CFLAGS = \
 	@XLIB_CFLAGS@ \
 	@LIBDRM_CFLAGS@ \
 	@DRIPROTO_CFLAGS@ \
-	-DXFree86Server \
 	@GLX_DEFINES@ \
 	@GLX_ARCH_DEFINES@
 
@@ -41,11 +40,9 @@ glapi_sources =					\
 	indirect_table.c			\
 	dispatch.h				\
 	glapitable.h				\
-	glapitemp.h				\
 	glapi.h					\
 	glapi_gentable.c			\
 	glapioffsets.h				\
-	glprocs.h				\
 	glthread.h
 
 libglxdri_la_SOURCES =

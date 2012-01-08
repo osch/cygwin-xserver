@@ -49,8 +49,8 @@
 #define WINDOW_TITLE_XDMCP	"%s:%s.%d"
 #define WIN_SCR_PROP		"cyg_screen_prop rl"
 #define WINDOW_CLASS_X		"cygwin/x X rl"
-#define WINDOW_CLASS_X_CHILD    "cygwin/x X child"
 #define WINDOW_CLASS_X_MSG      "cygwin/x X msg"
+#define WINDOW_CLASS_X_CHILD    "cygwin/x X child"
 #define WINDOW_TITLE_X		PROJECT_NAME " X"
 #define WIN_WINDOW_PROP		"cyg_window_prop_rl"
 #ifdef HAS_DEVWINDOWS
@@ -133,6 +133,9 @@ typedef struct _winWMMessageRec{
 #define		MwmDecorBorder		(1l << 1)
 #define		MwmDecorHandle		(1l << 2)
 #define		MwmDecorTitle		(1l << 3)
+#define		MwmDecorMenu		(1l << 4)
+#define		MwmDecorMinimize	(1l << 5)
+#define		MwmDecorMaximize	(1l << 6)
 
 /* This structure only contains 3 elements... the Motif 2.0 structure
 contains 5... we only need the first 3... so that is all we will define */

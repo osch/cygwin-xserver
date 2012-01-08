@@ -31,7 +31,7 @@ cd ../../..
 cd cygwin
 export PKG_CONFIG_PATH=`cd ../install/lib/pkgconfig; pwd`:$PKG_CONFIG_PATH
 ./autogen.sh -V
-./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --with-sha1=libgcrypt
+./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --disable-glx --disable-aiglx --with-sha1=libgcrypt --disable-unit-tests
 make
 hw/xwin/XWin :1 -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons
 
@@ -41,3 +41,8 @@ hw/xwin/XWin :1 -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emula
 # C:\cygwin\bin\run.exe bash /cygdrive/c/cygwin/startx-custom.sh
 # 
 nohup /usr/local/bin/Xwin -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons 2>/dev/null 1>&2 & LANG=C.ISO-8859-1 xterm -display localhost:0 -e bash -i -ls &
+
+
+# see also current development: 
+# http://cgit.freedesktop.org/~jturney/xserver/
+

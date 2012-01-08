@@ -146,6 +146,5 @@ int
 winClipboardFlushXEvents (HWND hwnd,
 			  int iWindow,
 			  Display *pDisplay,
-			  Bool fUseUnicode);
-
+			  Bool fUnicodeSupport);
 #endif

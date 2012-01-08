@@ -574,6 +574,8 @@ winCreateWindowsTopLevelWindow (WindowPtr pWin)
   winPrivScreenPtr	pScreenPriv = pWinPriv->pScreenPriv;
   WinXSizeHints         hints;
   WindowPtr		pDaddy;
+  DWORD dwStyle, dwExStyle;
+  RECT rc;
 
   winInitMultiWindowClass();
 
@@ -621,17 +623,16 @@ winCreateWindowsTopLevelWindow (WindowPtr pWin)
 
   winDebug("winCreateWindowsTopLevelWindow - %dx%d @ %dx%d\n", iWidth, iHeight, iX, iY);
 
-
-  /* Make it WS_OVERLAPPED in create call since WS_POPUP doesn't support */
+  /* Create the window */
+  /* Make it OVERLAPPED in create call since WS_POPUP doesn't support */
   /* CW_USEDEFAULT, change back to popup after creation */
-  DWORD dwStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-  DWORD dwExStyle = WS_EX_TOOLWINDOW;
+  dwStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+  dwExStyle = WS_EX_TOOLWINDOW;
 
   /*
      Calculate the window coordinates containing the requested client area,
      being careful to preseve CW_USEDEFAULT
   */
-  RECT rc;
   rc.top = (iY != CW_USEDEFAULT) ? iY : 0;
   rc.left = (iX != CW_USEDEFAULT) ? iX : 0;
   rc.bottom = rc.top + iHeight;
@@ -819,6 +820,7 @@ winDestroyWindowsWindow (WindowPtr pWin)
   /* Store the info we need to destroy after this window is gone */
   hIcon = (HICON)SendMessage(pWinPriv->hWnd, WM_GETICON, ICON_BIG, 0);
   hIconSm = (HICON)SendMessage(pWinPriv->hWnd, WM_GETICON, ICON_SMALL, 0);
+
   hWnd = pWinPriv->hWnd;
 
   /* DestroyWindow() implicitly destroys all child windows,
@@ -862,6 +864,7 @@ winUpdateWindowsWindow (WindowPtr pWin)
   ErrorF ("winUpdateWindowsWindow\n");
 #endif
 
+
   /* Ignore the root window */
   if (pWin->parent == NULL)
     return;
@@ -878,6 +881,11 @@ winUpdateWindowsWindow (WindowPtr pWin)
               winCreateWindowsWindow (pWin);
               assert (pWinPriv->hWnd != NULL);
             }
+
+         /* Display the window without activating it */
+         if (pWin->drawable.class != InputOnly)
+           ShowWindow (pWinPriv->hWnd, SW_SHOWNOACTIVATE);
+
         }
       /* It's not a top-level window, but we created a window for GLX */
       else if (pWinPriv->hWnd)

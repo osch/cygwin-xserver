@@ -61,6 +61,7 @@
 #include "window.h"
 #include "pixmapstr.h"
 #include "windowstr.h"
+#include "winglobals.h"
 
 #include <shlwapi.h>
 
@@ -158,7 +159,7 @@ static Bool
 InitQueue (WMMsgQueuePtr pQueue);
 
 static void
-GetWindowName (Display * pDpy, Window iWin, wchar_t **ppName);
+GetWindowName (Display * pDpy, Window iWin, char **ppWindowName);
 
 static int
 SendXMessage (Display *pDisplay, Window iWin, Atom atmType, long nData);
@@ -425,30 +426,60 @@ InitQueue (WMMsgQueuePtr pQueue)
   return TRUE;
 }
 
+static
+char *Xutf8TextPropertyToString(Display *pDisplay, XTextProperty *xtp)
+{
+  int nNum;
+  char **ppList;
+  char *pszReturnData;
+
+  if (Xutf8TextPropertyToTextList (pDisplay, xtp, &ppList, &nNum) >= Success && nNum > 0 && *ppList)
+    {
+      int i;
+      int iLen = 0;
+
+      for (i = 0; i < nNum; i++)
+        iLen += strlen(ppList[i]);
+      pszReturnData = (char *) malloc (iLen + 1);
+      pszReturnData[0] = '\0';
+      for (i = 0; i < nNum; i++)
+        strcat (pszReturnData, ppList[i]);
+      if (ppList)
+        XFreeStringList (ppList);
+    }
+  else
+    {
+      pszReturnData = (char *) malloc (1);
+      pszReturnData[0] = '\0';
+    }
+
+  return pszReturnData;
+}
 
 /*
  * GetWindowName - Retrieve the title of an X Window
  */
 
 static void
-GetWindowName (Display *pDisplay, Window iWin, wchar_t **ppName)
+GetWindowName (Display *pDisplay, Window iWin, char **ppWindowName)
 {
-  int			nResult, nNum;
-  char			**ppList;
-  char			*pszReturnData;
-  int			iLen, i;
-  XTextProperty		xtpName;
-  
+  int nResult;
+  XTextProperty	xtpWindowName;
+  XTextProperty xtpClientMachine;
+  char *pszWindowName;
+  char *pszClientMachine;
+  char hostname[HOST_NAME_MAX + 1];
+
 #if CYGMULTIWINDOW_DEBUG
   ErrorF ("GetWindowName\n");
 #endif
 
-  /* Intialize ppName to NULL */
-  *ppName = NULL;
+  /* Intialize ppWindowName to NULL */
+  *ppWindowName = NULL;
 
-  /* Try to get --- */
-  nResult = XGetWMName (pDisplay, iWin, &xtpName);
-  if (!nResult || !xtpName.value || !xtpName.nitems)
+  /* Try to get window name */
+  nResult = XGetWMName (pDisplay, iWin, &xtpWindowName);
+  if (!nResult || !xtpWindowName.value || !xtpWindowName.nitems)
     {
 #if CYGMULTIWINDOW_DEBUG
       ErrorF ("GetWindowName - XGetWMName failed.  No name.\n");
@@ -456,29 +487,43 @@ GetWindowName (Display *pDisplay, Window iWin, wchar_t **ppName)
       return;
     }
 
-   if (Xutf8TextPropertyToTextList (pDisplay, &xtpName, &ppList, &nNum) >= Success && nNum > 0 && *ppList)
-   {
- 	iLen = 0;
- 	for (i = 0; i < nNum; i++) iLen += strlen(ppList[i]);
- 	pszReturnData = (char *) malloc (iLen + 1);
- 	pszReturnData[0] = '\0';
- 	for (i = 0; i < nNum; i++) strcat (pszReturnData, ppList[i]);
- 	if (ppList) XFreeStringList (ppList);
-   }
-   else
-   {
- 	pszReturnData = (char *) malloc (1);
- 	pszReturnData[0] = '\0';
-   }
-   iLen = MultiByteToWideChar (CP_UTF8, 0, pszReturnData, -1, NULL, 0);
-   *ppName = (wchar_t*)malloc(sizeof(wchar_t)*(iLen + 1));
-   MultiByteToWideChar (CP_UTF8, 0, pszReturnData, -1, *ppName, iLen);
-   XFree (xtpName.value);
-   free (pszReturnData);
+  pszWindowName = Xutf8TextPropertyToString(pDisplay, &xtpWindowName);
+  XFree(xtpWindowName.value);
 
-#if CYGMULTIWINDOW_DEBUG
-  ErrorF ("GetWindowName - Returning\n");
-#endif
+  if (g_fHostInTitle)
+    {
+      /* Try to get client machine name */
+      nResult = XGetWMClientMachine(pDisplay, iWin, &xtpClientMachine);
+      if (nResult && xtpClientMachine.value && xtpClientMachine.nitems)
+        {
+          pszClientMachine = Xutf8TextPropertyToString(pDisplay, &xtpClientMachine);
+          XFree(xtpClientMachine.value);
+
+          /*
+            If we have a client machine name
+            and it's not the local host name...
+          */
+          if (strlen(pszClientMachine) &&
+              !gethostname(hostname, HOST_NAME_MAX + 1) &&
+              strcmp (hostname, pszClientMachine))
+            {
+              /* ... add ' (on <clientmachine>)' to end of window name */
+              *ppWindowName = malloc(strlen(pszWindowName) + strlen(pszClientMachine) + 7);
+              strcpy(*ppWindowName, pszWindowName);
+              strcat(*ppWindowName, " (on ");
+              strcat(*ppWindowName, pszClientMachine);
+              strcat(*ppWindowName, ")");
+
+              free(pszWindowName);
+              free(pszClientMachine);
+
+              return;
+            }
+        }
+    }
+
+  /* otherwise just return the window name */
+  *ppWindowName = pszWindowName;
 }
 
 
@@ -511,7 +556,6 @@ SendXMessage (Display *pDisplay, Window iWin, Atom atmType, long nData)
 static void
 UpdateName (WMInfoPtr pWMInfo, Window iWindow)
 {
-  wchar_t		*pszName;
   Atom			atmType;
   int			fmtRet;
   unsigned long		items, remain;
@@ -540,26 +584,33 @@ UpdateName (WMInfoPtr pWMInfo, Window iWindow)
 	  XFree (retHwnd);
 	}
     }
-  
+
   /* Some sanity checks */
   if (!hWnd) return;
   if (!IsWindow (hWnd)) return;
 
-  /* Set the Windows window name */
-  GetWindowName (pWMInfo->pDisplay, iWindow, &pszName);
-  if (pszName)
+  /* If window isn't override-redirect */
+  XGetWindowAttributes (pWMInfo->pDisplay, iWindow, &attr);
+  if (!attr.override_redirect)
     {
-      /* Get the window attributes */
-      XGetWindowAttributes (pWMInfo->pDisplay,
-			    iWindow,
-			    &attr);
-      if (!attr.override_redirect)
-	{
-	  SetWindowTextW (hWnd, pszName);
-	  winUpdateIcon (iWindow);
-	}
+      char *pszWindowName;
+      /* Get the X windows window name */
+      GetWindowName (pWMInfo->pDisplay, iWindow, &pszWindowName);
 
-      free (pszName);
+      if (pszWindowName)
+        {
+          /* Convert from UTF-8 to wide char */
+          int iLen = MultiByteToWideChar (CP_UTF8, 0, pszWindowName, -1, NULL, 0);
+          wchar_t *pwszWideWindowName = (wchar_t*)malloc(sizeof(wchar_t)*(iLen + 1));
+          MultiByteToWideChar (CP_UTF8, 0, pszWindowName, -1, pwszWideWindowName, iLen);
+
+          /* Set the Windows window name */
+          SetWindowTextW (hWnd, pwszWideWindowName);
+          winUpdateIcon (iWindow);
+
+          free (pwszWideWindowName);
+          free (pszWindowName);
+        }
     }
 }
 
@@ -1577,6 +1628,8 @@ winDeinitMultiWindowWM (void)
 #define HINT_SIZEBOX	(1l<<2)
 #define HINT_CAPTION	(1l<<3)
 #define HINT_NOMAXIMIZE (1L<<4)
+#define HINT_NOMINIMIZE (1L<<5)
+#define HINT_NOSYSMENU  (1L<<6)
 /* These two are used on their own */
 #define HINT_MAX	(1L<<0)
 #define HINT_MIN	(1L<<1)
@@ -1635,6 +1688,16 @@ winApplyHints (Display *pDisplay, Window iWindow, HWND hWnd, HWND *zstyle)
 	if (mwm_hint->decorations & MwmDecorBorder) hint |= HINT_BORDER;
 	if (mwm_hint->decorations & MwmDecorHandle) hint |= HINT_SIZEBOX;
 	if (mwm_hint->decorations & MwmDecorTitle) hint |= HINT_CAPTION;
+	if (!(mwm_hint->decorations & MwmDecorMenu)) hint |= HINT_NOSYSMENU;
+	if (!(mwm_hint->decorations & MwmDecorMinimize)) hint |= HINT_NOMINIMIZE;
+	if (!(mwm_hint->decorations & MwmDecorMaximize)) hint |= HINT_NOMAXIMIZE;
+      }
+      else
+      {
+        /*
+           MwmDecorAll means all decorations *except* those specified by other flag
+           bits that are set.  Not yet implemented.
+        */
       }
     }
     if (mwm_hint) XFree(mwm_hint);
@@ -1749,6 +1812,12 @@ winApplyHints (Display *pDisplay, Window iWindow, HWND hWnd, HWND *zstyle)
 
   if (hint & HINT_NOMAXIMIZE)
     style = style & ~WS_MAXIMIZEBOX;
+
+  if (hint & HINT_NOMINIMIZE)
+    style = style & ~WS_MINIMIZEBOX;
+
+  if (hint & HINT_NOSYSMENU)
+    style = style & ~WS_SYSMENU;
 
   SetWindowLongPtr (hWnd, GWL_STYLE, style);
 }

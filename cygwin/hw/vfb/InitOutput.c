@@ -150,7 +150,7 @@ vfbBitsPerPixel(int depth)
 }
 
 void
-ddxGiveUp(void)
+ddxGiveUp(enum ExitCode error)
 {
     int i;
 
@@ -201,9 +201,9 @@ ddxGiveUp(void)
 }
 
 void
-AbortDDX(void)
+AbortDDX(enum ExitCode error)
 {
-    ddxGiveUp();
+    ddxGiveUp(error);
 }
 
 #ifdef __APPLE__
@@ -280,7 +280,9 @@ ddxProcessArgument(int argc, char *argv[], int i)
 	int screenNum;
 	CHECK_FOR_REQUIRED_ARGUMENTS(2);
 	screenNum = atoi(argv[i+1]);
-	if (screenNum < 0)
+	/* The protocol only has a CARD8 for number of screens in the
+	   connection setup block, so don't allow more than that. */
+	if ((screenNum < 0) || (screenNum >= 255))
 	{
 	    ErrorF("Invalid screen number %d\n", screenNum);
 	    UseMsg();
@@ -864,6 +866,8 @@ vfbScreenInit(int index, ScreenPtr pScreen, int argc, char **argv)
 				   (1 << DirectColor)),
 				  10, TrueColor, 0x3ff00000, 0x000ffc00, 0x000003ff);
 	break;
+    default:
+	return FALSE;
     }
 
     miSetPixmapDepths ();
