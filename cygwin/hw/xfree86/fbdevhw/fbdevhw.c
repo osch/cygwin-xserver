@@ -48,7 +48,6 @@ _X_EXPORT XF86ModuleData fbdevhwModuleData = {
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 
 /* -------------------------------------------------------------------- */
 /* our private data, and two functions to allocate/free this            */
@@ -510,20 +509,22 @@ fbdevHWSetVideoModes(ScrnInfoPtr pScrn)
 	pScrn->virtualY = pScrn->display->virtualY;
 
 	for (modename = pScrn->display->modes; *modename != NULL; modename++) {
-		for (mode = pScrn->monitor->Modes; mode != NULL; mode = mode->next)
-			if (0 == strcmp(mode->name,*modename))
-				break;
+		for (mode = pScrn->monitor->Modes; mode != NULL; mode = mode->next) {
+			if (0 == strcmp(mode->name,*modename)) {
+				if (fbdevHWSetMode(pScrn, mode, TRUE))
+					break;
+
+				xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+					   "\tmode \"%s\" test failed\n", *modename);
+			}
+		}
+
 		if (NULL == mode) {
 			xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 				   "\tmode \"%s\" not found\n", *modename);
 			continue;
 		}
 
-		if (!fbdevHWSetMode(pScrn, mode, TRUE)) {
-			xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-				   "\tmode \"%s\" test failed\n", *modename);
-			continue;
-		}
 		xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 			   "\tmode \"%s\" ok\n", *modename);
 

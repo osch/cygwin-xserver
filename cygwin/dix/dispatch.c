@@ -130,6 +130,7 @@ int ProcInitialConnection();
 #include "inputstr.h"
 #include "xkbsrv.h"
 #include "site.h"
+#include "client.h"
 #include "ddxhooks.h"
 
 #ifdef XSERVER_DTRACE
@@ -1424,7 +1425,6 @@ CreatePmap:
 	}
 	if (AddResource(stuff->pid, RT_PIXMAP, (pointer)pMap))
 	    return Success;
-	(*pDraw->pScreen->DestroyPixmap)(pMap);
     }
     return BadAlloc;
 }
@@ -2981,11 +2981,17 @@ ProcCreateCursor (ClientPtr client)
 			 &pCursor, client, stuff->cid);
 
     if (rc != Success)
-	return rc;
-    if (!AddResource(stuff->cid, RT_CURSOR, (pointer)pCursor))
-	return BadAlloc;
+	goto bail;
+    if (!AddResource(stuff->cid, RT_CURSOR, (pointer)pCursor)) {
+	rc = BadAlloc;
+	goto bail;
+    }
 
     return Success;
+bail:
+    free(srcbits);
+    free(mskbits);
+    return rc;
 }
 
 int
@@ -3465,6 +3471,9 @@ CloseDownClient(ClientPtr client)
 	    CallCallbacks((&ClientStateCallback), (pointer)&clientinfo);
 	} 	    
 	FreeClientResources(client);
+	/* Disable client ID tracking. This must be done after
+	 * ClientStateCallback. */
+	ReleaseClientIds(client);
 #ifdef XSERVER_DTRACE
 	XSERVER_CLIENT_DISCONNECT(client->index);
 #endif	
@@ -3502,6 +3511,7 @@ void InitClient(ClientPtr client, int i, pointer ospriv)
     client->smart_start_tick = SmartScheduleTime;
     client->smart_stop_tick = SmartScheduleTime;
     client->smart_check_tick = SmartScheduleTime;
+    client->clientIds = NULL;
 }
 
 /************************
@@ -3541,6 +3551,11 @@ ClientPtr NextAvailableClient(pointer ospriv)
 	currentMaxClients++;
     while ((nextFreeClientID < MAXCLIENTS) && clients[nextFreeClientID])
 	nextFreeClientID++;
+
+    /* Enable client ID tracking. This must be done before
+     * ClientStateCallback. */
+    ReserveClientIds(client);
+
     if (ClientStateCallback)
     {
 	NewClientInfoRec clientinfo;

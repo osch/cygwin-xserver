@@ -1,0 +1,5 @@
+category: X11
+requires:
+external-source: xorg-server
+sdesc: "X.Org X servers (debug symbols)"
+ldesc: "X.Org X servers (debug symbols)"

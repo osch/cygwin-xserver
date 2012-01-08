@@ -376,7 +376,7 @@ static void
 xf86ReleaseKeys(DeviceIntPtr pDev)
 {
     KeyClassPtr keyc;
-    int i, j, nevents, sigstate;
+    int i, sigstate;
 
     if (!pDev || !pDev->key)
         return;
@@ -399,9 +399,7 @@ xf86ReleaseKeys(DeviceIntPtr pDev)
          i++) {
         if (key_is_down(pDev, i, KEY_POSTED)) {
             sigstate = xf86BlockSIGIO ();
-            nevents = GetKeyboardEvents(xf86Events, pDev, KeyRelease, i);
-            for (j = 0; j < nevents; j++)
-                mieqEnqueue(pDev, (InternalEvent*)(xf86Events + j)->event);
+            QueueKeyboardEvents(pDev, KeyRelease, i, NULL);
             xf86UnblockSIGIO(sigstate);
         }
     }
@@ -603,16 +601,15 @@ xf86AddGeneralHandler(int fd, InputHandlerProc proc, pointer data)
 InputHandlerProc
 xf86SetConsoleHandler(InputHandlerProc proc, pointer data)
 {
-    static InputHandlerProc handler = NULL;
-    InputHandlerProc old_handler = handler;
+    static IHPtr handler = NULL;
+    IHPtr old_handler = handler;
 
     if (old_handler)
         xf86RemoveGeneralHandler(old_handler);
 
-    xf86AddGeneralHandler(xf86Info.consoleFd, proc, data);
-    handler = proc;
+    handler = xf86AddGeneralHandler(xf86Info.consoleFd, proc, data);
 
-    return old_handler;
+    return (old_handler) ? old_handler->ihproc : NULL;
 }
 
 static void

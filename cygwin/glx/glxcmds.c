@@ -217,7 +217,7 @@ void
 FlushContext(__GLXcontext *cx)
 {
   CALL_Flush( GET_DISPATCH(), () );
-  __GLX_NOTE_FLUSHED_CMDS(cx);
+  cx->hasUnflushedCommands = GL_FALSE;
 }
 
 /**
@@ -593,10 +593,10 @@ DoMakeCurrent(__GLXclientState *cl,
 	/*
 	** Flush the previous context if needed.
 	*/
-	if (__GLX_HAS_UNFLUSHED_CMDS(prevglxc)) {
+	if (prevglxc->hasUnflushedCommands) {
 	    if (__glXForceCurrent(cl, tag, (int *)&error)) {
 		CALL_Flush( GET_DISPATCH(), () );
-		__GLX_NOTE_FLUSHED_CMDS(prevglxc);
+		prevglxc->hasUnflushedCommands = GL_FALSE;
 	    } else {
 		return error;
 	    }
@@ -862,7 +862,7 @@ int __glXDisp_CopyContext(__GLXclientState *cl, GLbyte *pc)
 	    ** in both streams are completed before the copy is executed.
 	    */
 	    CALL_Finish( GET_DISPATCH(), () );
-	    __GLX_NOTE_FLUSHED_CMDS(tagcx);
+	    tagcx->hasUnflushedCommands = GL_FALSE;
 	} else {
 	    return error;
 	}
@@ -1576,7 +1576,7 @@ int __glXDisp_SwapBuffers(__GLXclientState *cl, GLbyte *pc)
 	    ** in both streams are completed before the swap is executed.
 	    */
 	    CALL_Finish( GET_DISPATCH(), () );
-	    __GLX_NOTE_FLUSHED_CMDS(glxc);
+	    glxc->hasUnflushedCommands = GL_FALSE;
 	} else {
 	    return error;
 	}
@@ -1775,7 +1775,7 @@ int __glXDisp_CopySubBufferMESA(__GLXclientState *cl, GLbyte *pc)
 	    ** in both streams are completed before the swap is executed.
 	    */
 	    CALL_Finish( GET_DISPATCH(), () );
-	    __GLX_NOTE_FLUSHED_CMDS(glxc);
+	    glxc->hasUnflushedCommands = GL_FALSE;
 	} else {
 	    return error;
 	}
@@ -1962,7 +1962,7 @@ int __glXDisp_Render(__GLXclientState *cl, GLbyte *pc)
 	left -= cmdlen;
 	commandsDone++;
     }
-    __GLX_NOTE_UNFLUSHED_CMDS(glxc);
+    glxc->hasUnflushedCommands = GL_TRUE;
     return Success;
 }
 
@@ -2159,7 +2159,7 @@ int __glXDisp_RenderLarge(__GLXclientState *cl, GLbyte *pc)
 	    ** Skip over the header and execute the command.
 	    */
 	    (*proc)(cl->largeCmdBuf + __GLX_RENDER_LARGE_HDR_SIZE);
-	    __GLX_NOTE_UNFLUSHED_CMDS(glxc);
+	    glxc->hasUnflushedCommands = GL_TRUE;
 
 	    /*
 	    ** Reset for the next RenderLarge series.

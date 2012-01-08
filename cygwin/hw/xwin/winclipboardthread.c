@@ -60,9 +60,9 @@ extern Window		g_iClipboardWindow;
  */
 
 static jmp_buf			g_jmpEntry;
+static int clipboardRestarts = 0;
 static XIOErrorHandler g_winClipboardOldIOErrorHandler;
 static pthread_t g_winClipboardProcThread;
-static int clipboardRestarts = 0;
 
 Bool				g_fUnicodeSupport = FALSE;
 Bool				g_fUseUnicode = FALSE;
@@ -437,7 +437,6 @@ winClipboardProc_Done:
   g_pClipboardDisplay = NULL;
   g_hwndClipboard = NULL;
 
-  pthread_cleanup_pop(0);
   /* checking if we need to restart */
   if (clipboardRestarts >= WIN_CLIPBOARD_RETRIES)
     {
@@ -468,6 +467,8 @@ winClipboardProc_Done:
       /* clipboard thread has exited, stop server as well */
       kill(getpid(), SIGTERM);
     }
+
+  pthread_cleanup_pop(0);
 
   return NULL;
 }

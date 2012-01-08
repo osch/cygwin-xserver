@@ -231,17 +231,6 @@ OsSignal(int sig, OsSigHandlerPtr handler)
 #define LOCK_PREFIX "/.X"
 #define LOCK_SUFFIX "-lock"
 
-#ifndef PATH_MAX
-#include <sys/param.h>
-#ifndef PATH_MAX
-#ifdef MAXPATHLEN
-#define PATH_MAX MAXPATHLEN
-#else
-#define PATH_MAX 1024
-#endif
-#endif
-#endif
-
 static Bool StillLocking = FALSE;
 static char LockFile[PATH_MAX];
 Bool nolock = FALSE;
@@ -306,7 +295,7 @@ LockServer(void)
     FatalError("Could not create lock file in %s\n", tmp);
   (void) sprintf(pid_str, "%10ld\n", (long)getpid());
   (void) write(lfd, pid_str, 11);
-  (void) chmod(tmp, 0444);
+  (void) fchmod(lfd, 0444);
   (void) close(lfd);
 
   /*
@@ -327,7 +316,7 @@ LockServer(void)
       /*
        * Read the pid from the existing file
        */
-      lfd = open(LockFile, O_RDONLY);
+      lfd = open(LockFile, O_RDONLY|O_NOFOLLOW);
       if (lfd < 0) {
         unlink(tmp);
         FatalError("Can't read lock file %s\n", LockFile);
@@ -1265,6 +1254,25 @@ OsAbort (void)
  * as well.  As it is now, xkbcomp messages don't end up in the log file.
  */
 
+#ifdef __CYGWIN__
+#include <process.h>
+int
+System(char *command)
+{
+    int status;
+    if (!command)
+	return 1;
+
+    DebugF("System: `%s'\n", command);
+
+    /*
+      Use spawnl() rather than execl() to implement System() on cygwin to
+      avoid fork emulation overhead and brittleness
+    */
+    status = spawnl(_P_WAIT, "/bin/sh", "sh", "-c", command, (char *)NULL);
+    return status;
+}
+#else
 int
 System(char *command)
 {
@@ -1306,6 +1314,7 @@ System(char *command)
 
     return p == -1 ? -1 : status;
 }
+#endif
 
 static struct pid {
     struct pid *next;

@@ -848,7 +848,7 @@ ProcPanoramiXShmGetImage(ClientPtr client)
 	return BadAlloc;
 
     drawables[0] = pDraw;
-    for(i = 1; i < PanoramiXNumScreens; i++) {
+    FOR_NSCREENS_FORWARD_SKIP(i) {
 	rc = dixLookupDrawable(drawables+i, draw->info[i].id, client, 0, 
 			       DixReadAccess);
 	if (rc != Success)
@@ -972,9 +972,7 @@ CreatePmap:
 
     newPix->type = XRT_PIXMAP;
     newPix->u.pix.shared = TRUE;
-    newPix->info[0].id = stuff->pid;
-    for(j = 1; j < PanoramiXNumScreens; j++)
-	newPix->info[j].id = FakeClientID(client->index);
+    panoramix_setup_ids(newPix, client, stuff->pid);
 
     result = Success;
 
@@ -993,7 +991,6 @@ CreatePmap:
 	    pMap->drawable.serialNumber = NEXT_SERIAL_NUMBER;
 	    pMap->drawable.id = newPix->info[j].id;
 	    if (!AddResource(newPix->info[j].id, RT_PIXMAP, (pointer)pMap)) {
-		(*pScreen->DestroyPixmap)(pMap);
 		result = BadAlloc;
 		break;
 	    }
@@ -1004,10 +1001,8 @@ CreatePmap:
     }
 
     if(result == BadAlloc) {
-	while(j--) {
-	    (*pScreen->DestroyPixmap)(pMap);
+	while(j--)
 	    FreeResource(newPix->info[j].id, RT_NONE);
-	}
 	free(newPix);
     } else 
 	AddResource(stuff->pid, XRT_PIXMAP, newPix);
@@ -1112,7 +1107,6 @@ CreatePmap:
 	{
 	    return Success;
 	}
-	pDraw->pScreen->DestroyPixmap(pMap);
     }
     return BadAlloc;
 }
