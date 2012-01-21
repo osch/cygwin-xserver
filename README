@@ -38,7 +38,7 @@ hw/xwin/XWin :1 -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emula
 
 # shellscript startx-custom.sh
 # invoke from Windows link with target:
-# C:\cygwin\bin\run.exe bash /cygdrive/c/cygwin/startx-custom.sh
+# C:\cygwin\bin\run.exe -p /cygdrive/c/cygwin/bin bash /cygdrive/c/cygwin/startx-custom.sh
 # 
 nohup /usr/local/bin/Xwin -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons 2>/dev/null 1>&2 & LANG=C.ISO-8859-1 xterm -display localhost:0 -e bash -i -ls &
 
