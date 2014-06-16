@@ -38,10 +38,8 @@
 
 /* See Porting Layer Definition - p. 7 */
 void
-winWakeupHandler (int nScreen,
-		  pointer pWakeupData,
-		  unsigned long ulResult,
-		  pointer pReadmask)
+winWakeupHandler(ScreenPtr pScreen,
+                 unsigned long ulResult, pointer pReadmask)
 {
     /* was: handleNextWindowMessage, but
             this will block in WaitForSomething when
@@ -51,19 +49,15 @@ winWakeupHandler (int nScreen,
 
 void handleNextWindowMessage(void)
 {
-  MSG			msg;
+    MSG msg;
 
-  /* Process one message from our queue */
-  if (PeekMessage (&msg, NULL, 0, 0, PM_REMOVE))
-    {
-      if ((g_hDlgDepthChange == 0
-	   || !IsDialogMessage (g_hDlgDepthChange, &msg))
-	  && (g_hDlgExit == 0
-	      || !IsDialogMessage (g_hDlgExit, &msg))
-	  && (g_hDlgAbout == 0
-	      || !IsDialogMessage (g_hDlgAbout, &msg)))
-	{
-	  DispatchMessage (&msg);
-	}
+    /* Process one message from our queue */
+    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        if ((g_hDlgDepthChange == 0
+             || !IsDialogMessage(g_hDlgDepthChange, &msg))
+            && (g_hDlgExit == 0 || !IsDialogMessage(g_hDlgExit, &msg))
+            && (g_hDlgAbout == 0 || !IsDialogMessage(g_hDlgAbout, &msg))) {
+            DispatchMessage(&msg);
+        }
     }
 }

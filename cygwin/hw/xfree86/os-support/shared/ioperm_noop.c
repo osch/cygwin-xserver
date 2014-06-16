@@ -36,14 +36,13 @@
 #include "xf86_OSlib.h"
 
 Bool
-xf86EnableIO()
+xf86EnableIO(void)
 {
-	return TRUE;
+    return TRUE;
 }
 
 void
-xf86DisableIO()
+xf86DisableIO(void)
 {
-	return;
+    return;
 }
-

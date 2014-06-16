@@ -54,9 +54,9 @@ SOFTWARE.
 #include <dix-config.h>
 #endif
 
-#include "inputstr.h"	/* DeviceIntPtr      */
+#include "inputstr.h"           /* DeviceIntPtr      */
 #include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>	/* control constants */
+#include <X11/extensions/XIproto.h>     /* control constants */
 #include "XIstubs.h"
 
 #include "exglobals.h"
@@ -74,24 +74,23 @@ SOFTWARE.
 int
 SProcXChangeDeviceControl(ClientPtr client)
 {
-    char n;
     xDeviceCtl *ctl;
 
     REQUEST(xChangeDeviceControlReq);
-    swaps(&stuff->length, n);
+    swaps(&stuff->length);
     REQUEST_AT_LEAST_SIZE(xChangeDeviceControlReq);
-    swaps(&stuff->control, n);
-    ctl = (xDeviceCtl*)&stuff[1];
-    swaps(&ctl->control, n);
-    swaps(&ctl->length, n);
-    switch(stuff->control) {
-        case DEVICE_ABS_CALIB:
-        case DEVICE_ABS_AREA:
-        case DEVICE_CORE:
-        case DEVICE_ENABLE:
-        case DEVICE_RESOLUTION:
-            /* hmm. beer. *drool* */
-            break;
+    swaps(&stuff->control);
+    ctl = (xDeviceCtl *) &stuff[1];
+    swaps(&ctl->control);
+    swaps(&ctl->length);
+    switch (stuff->control) {
+    case DEVICE_ABS_CALIB:
+    case DEVICE_ABS_AREA:
+    case DEVICE_CORE:
+    case DEVICE_ENABLE:
+    case DEVICE_RESOLUTION:
+        /* hmm. beer. *drool* */
+        break;
 
     }
     return (ProcXChangeDeviceControl(client));
@@ -114,7 +113,6 @@ ProcXChangeDeviceControl(ClientPtr client)
     AxisInfoPtr a;
     CARD32 *resolution;
     xDeviceEnableCtl *e;
-    devicePresenceNotify dpn;
 
     REQUEST(xChangeDeviceControlReq);
     REQUEST_AT_LEAST_SIZE(xChangeDeviceControlReq);
@@ -124,51 +122,63 @@ ProcXChangeDeviceControl(ClientPtr client)
     if (ret != Success)
         goto out;
 
-    rep.repType = X_Reply;
-    rep.RepType = X_ChangeDeviceControl;
-    rep.length = 0;
-    rep.sequenceNumber = client->sequence;
+    /* XTest devices are special, none of the below apply to them anyway */
+    if (IsXTestDevice(dev, NULL)) {
+        ret = BadMatch;
+        goto out;
+    }
+
+    rep = (xChangeDeviceControlReply) {
+        .repType = X_Reply,
+        .RepType = X_ChangeDeviceControl,
+        .sequenceNumber = client->sequence,
+        .length = 0,
+        .status = Success,
+    };
 
     switch (stuff->control) {
     case DEVICE_RESOLUTION:
-	r = (xDeviceResolutionCtl *) & stuff[1];
-	if ((len < bytes_to_int32(sizeof(xDeviceResolutionCtl))) ||
-	    (len != bytes_to_int32(sizeof(xDeviceResolutionCtl)) + r->num_valuators)) {
+        r = (xDeviceResolutionCtl *) &stuff[1];
+        if ((len < bytes_to_int32(sizeof(xDeviceResolutionCtl))) ||
+            (len !=
+             bytes_to_int32(sizeof(xDeviceResolutionCtl)) + r->num_valuators)) {
             ret = BadLength;
             goto out;
-	}
-	if (!dev->valuator) {
+        }
+        if (!dev->valuator) {
             ret = BadMatch;
             goto out;
-	}
-	if ((dev->deviceGrab.grab) && !SameClient(dev->deviceGrab.grab, client)) {
-	    rep.status = AlreadyGrabbed;
+        }
+        if ((dev->deviceGrab.grab) && !SameClient(dev->deviceGrab.grab, client)) {
+            rep.status = AlreadyGrabbed;
             ret = Success;
             goto out;
-	}
-	resolution = (CARD32 *) (r + 1);
-	if (r->first_valuator + r->num_valuators > dev->valuator->numAxes) {
+        }
+        resolution = (CARD32 *) (r + 1);
+        if (r->first_valuator + r->num_valuators > dev->valuator->numAxes) {
             ret = BadValue;
             goto out;
-	}
-	status = ChangeDeviceControl(client, dev, (xDeviceCtl *) r);
-	if (status == Success) {
-	    a = &dev->valuator->axes[r->first_valuator];
-	    for (i = 0; i < r->num_valuators; i++)
-		if (*(resolution + i) < (a + i)->min_resolution ||
-		    *(resolution + i) > (a + i)->max_resolution)
-		    return BadValue;
-	    for (i = 0; i < r->num_valuators; i++)
-		(a++)->resolution = *resolution++;
+        }
+        status = ChangeDeviceControl(client, dev, (xDeviceCtl *) r);
+        if (status == Success) {
+            a = &dev->valuator->axes[r->first_valuator];
+            for (i = 0; i < r->num_valuators; i++)
+                if (*(resolution + i) < (a + i)->min_resolution ||
+                    *(resolution + i) > (a + i)->max_resolution)
+                    return BadValue;
+            for (i = 0; i < r->num_valuators; i++)
+                (a++)->resolution = *resolution++;
 
             ret = Success;
-	} else if (status == DeviceBusy) {
-	    rep.status = DeviceBusy;
+        }
+        else if (status == DeviceBusy) {
+            rep.status = DeviceBusy;
             ret = Success;
-	} else {
+        }
+        else {
             ret = BadMatch;
-	}
-	break;
+        }
+        break;
     case DEVICE_ABS_CALIB:
     case DEVICE_ABS_AREA:
         /* Calibration is now done through properties, and never had any effect
@@ -181,9 +191,12 @@ ProcXChangeDeviceControl(ClientPtr client)
         ret = BadMatch;
         break;
     case DEVICE_ENABLE:
-        e = (xDeviceEnableCtl *)&stuff[1];
+        e = (xDeviceEnableCtl *) &stuff[1];
 
-        status = ChangeDeviceControl(client, dev, (xDeviceCtl *) e);
+        if (IsXTestDevice(dev, NULL))
+            status = !Success;
+        else
+            status = ChangeDeviceControl(client, dev, (xDeviceCtl *) e);
 
         if (status == Success) {
             if (e->enable)
@@ -191,10 +204,12 @@ ProcXChangeDeviceControl(ClientPtr client)
             else
                 DisableDevice(dev, TRUE);
             ret = Success;
-        } else if (status == DeviceBusy) {
+        }
+        else if (status == DeviceBusy) {
             rep.status = DeviceBusy;
             ret = Success;
-        } else {
+        }
+        else {
             ret = BadMatch;
         }
 
@@ -203,13 +218,15 @@ ProcXChangeDeviceControl(ClientPtr client)
         ret = BadValue;
     }
 
-out:
+ out:
     if (ret == Success) {
-        dpn.type = DevicePresenceNotify;
-        dpn.time = currentTime.milliseconds;
-        dpn.devchange = DeviceControlChanged;
-        dpn.deviceid = dev->id;
-        dpn.control = stuff->control;
+        devicePresenceNotify dpn = {
+            .type = DevicePresenceNotify,
+            .time = currentTime.milliseconds,
+            .devchange = DeviceControlChanged,
+            .deviceid = dev->id,
+            .control = stuff->control
+        };
         SendEventToAllWindows(dev, DevicePresenceNotifyMask,
                               (xEvent *) &dpn, 1);
 
@@ -228,11 +245,9 @@ out:
 
 void
 SRepXChangeDeviceControl(ClientPtr client, int size,
-			 xChangeDeviceControlReply * rep)
+                         xChangeDeviceControlReply * rep)
 {
-    char n;
-
-    swaps(&rep->sequenceNumber, n);
-    swapl(&rep->length, n);
-    WriteToClient(client, size, (char *)rep);
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

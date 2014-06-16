@@ -20,7 +20,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 /* Properties managed by the server. */
 
 #ifndef _XSERVER_PROPERTIES_H_
@@ -29,6 +28,9 @@
 /* Type for a 4 byte float. Storage format IEEE 754 in client's default
  * byte-ordering. */
 #define XATOM_FLOAT "FLOAT"
+
+/* STRING. Seat name of this display */
+#define SEAT_ATOM_NAME "Xorg_Seat"
 
 /* BOOL. 0 - device disabled, 1 - device enabled */
 #define XI_PROP_ENABLED      "Device Enabled"
@@ -60,7 +62,6 @@
 /* FLOAT, format 32 */
 #define ACCEL_PROP_VELOCITY_SCALING "Device Accel Velocity Scaling"
 
-
 /* Axis labels */
 #define AXIS_LABEL_PROP "Axis Labels"
 
@@ -74,6 +75,8 @@
 #define AXIS_LABEL_PROP_REL_DIAL        "Rel Dial"
 #define AXIS_LABEL_PROP_REL_WHEEL       "Rel Vert Wheel"
 #define AXIS_LABEL_PROP_REL_MISC        "Rel Misc"
+#define AXIS_LABEL_PROP_REL_VSCROLL     "Rel Vert Scroll"
+#define AXIS_LABEL_PROP_REL_HSCROLL     "Rel Horiz Scroll"
 
 /*
  * Absolute axes
@@ -115,6 +118,9 @@
 #define AXIS_LABEL_PROP_ABS_MT_BLOB_ID     "Abs MT Blob ID"
 #define AXIS_LABEL_PROP_ABS_MT_TRACKING_ID "Abs MT Tracking ID"
 #define AXIS_LABEL_PROP_ABS_MT_PRESSURE    "Abs MT Pressure"
+#define AXIS_LABEL_PROP_ABS_MT_DISTANCE    "Abs MT Distance"
+#define AXIS_LABEL_PROP_ABS_MT_TOOL_X      "Abs MT Tool X"
+#define AXIS_LABEL_PROP_ABS_MT_TOOL_Y      "Abs MT Tool Y"
 #define AXIS_LABEL_PROP_ABS_MISC        "Abs Misc"
 
 /* Button names */

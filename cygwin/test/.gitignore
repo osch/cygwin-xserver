@@ -1,6 +1,12 @@
-xkb
+fixes
+hashtabletest
 input
-xtest
 list
 misc
-fixes
+os
+string
+touch
+xfree86
+xkb
+xtest
+signal-logging

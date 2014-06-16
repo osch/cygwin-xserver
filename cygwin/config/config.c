@@ -33,6 +33,15 @@
 #include "config-backends.h"
 
 void
+config_pre_init(void)
+{
+#ifdef CONFIG_UDEV
+    if (!config_udev_pre_init())
+        ErrorF("[config] failed to pre-init udev\n");
+#endif
+}
+
+void
 config_init(void)
 {
 #ifdef CONFIG_UDEV
@@ -40,18 +49,21 @@ config_init(void)
         ErrorF("[config] failed to initialise udev\n");
 #elif defined(CONFIG_NEED_DBUS)
     if (config_dbus_core_init()) {
-# ifdef CONFIG_DBUS_API
-       if (!config_dbus_init())
-	    ErrorF("[config] failed to initialise D-Bus API\n");
-# endif
-# ifdef CONFIG_HAL
+#ifdef CONFIG_DBUS_API
+        if (!config_dbus_init())
+            ErrorF("[config] failed to initialise D-Bus API\n");
+#endif
+#ifdef CONFIG_HAL
         if (!config_hal_init())
             ErrorF("[config] failed to initialise HAL\n");
-# endif
+#endif
     }
     else {
-	ErrorF("[config] failed to initialise D-Bus core\n");
+        ErrorF("[config] failed to initialise D-Bus core\n");
     }
+#elif defined(CONFIG_WSCONS)
+    if (!config_wscons_init())
+        ErrorF("[config] failed to initialise wscons\n");
 #endif
 }
 
@@ -61,13 +73,23 @@ config_fini(void)
 #if defined(CONFIG_UDEV)
     config_udev_fini();
 #elif defined(CONFIG_NEED_DBUS)
-# ifdef CONFIG_HAL
+#ifdef CONFIG_HAL
     config_hal_fini();
-# endif
-# ifdef CONFIG_DBUS_API
+#endif
+#ifdef CONFIG_DBUS_API
     config_dbus_fini();
-# endif
+#endif
     config_dbus_core_fini();
+#elif defined(CONFIG_WSCONS)
+    config_wscons_fini();
+#endif
+}
+
+void
+config_odev_probe(config_odev_probe_proc_ptr probe_callback)
+{
+#if defined(CONFIG_UDEV_KMS)
+    config_udev_odev_probe(probe_callback);
 #endif
 }
 
@@ -107,14 +129,12 @@ device_is_duplicate(const char *config_info)
 {
     DeviceIntPtr dev;
 
-    for (dev = inputInfo.devices; dev; dev = dev->next)
-    {
+    for (dev = inputInfo.devices; dev; dev = dev->next) {
         if (dev->config_info && (strcmp(dev->config_info, config_info) == 0))
             return TRUE;
     }
 
-    for (dev = inputInfo.off_devices; dev; dev = dev->next)
-    {
+    for (dev = inputInfo.off_devices; dev; dev = dev->next) {
         if (dev->config_info && (strcmp(dev->config_info, config_info) == 0))
             return TRUE;
     }
@@ -122,18 +142,50 @@ device_is_duplicate(const char *config_info)
     return FALSE;
 }
 
-void
-add_option(InputOption **options, const char *key, const char *value)
+struct OdevAttributes *
+config_odev_allocate_attribute_list(void)
 {
-    if (!value || *value == '\0')
-        return;
+    struct OdevAttributes *attriblist;
 
-    for (; *options; options = &(*options)->next)
-        ;
-    *options = calloc(sizeof(**options), 1);
-    if (!*options) /* Yeesh. */
-        return;
-    (*options)->key = strdup(key);
-    (*options)->value = strdup(value);
-    (*options)->next = NULL;
+    attriblist = malloc(sizeof(struct OdevAttributes));
+    if (!attriblist)
+        return NULL;
+
+    xorg_list_init(&attriblist->list);
+    return attriblist;
+}
+
+void
+config_odev_free_attribute_list(struct OdevAttributes *attribs)
+{
+    config_odev_free_attributes(attribs);
+    free(attribs);
+}
+
+Bool
+config_odev_add_attribute(struct OdevAttributes *attribs, int attrib,
+                          const char *attrib_name)
+{
+    struct OdevAttribute *oa;
+
+    oa = malloc(sizeof(struct OdevAttribute));
+    if (!oa)
+        return FALSE;
+
+    oa->attrib_id = attrib;
+    oa->attrib_name = strdup(attrib_name);
+    xorg_list_append(&oa->member, &attribs->list);
+    return TRUE;
+}
+
+void
+config_odev_free_attributes(struct OdevAttributes *attribs)
+{
+    struct OdevAttribute *iter, *safe;
+
+    xorg_list_for_each_entry_safe(iter, safe, &attribs->list, member) {
+        xorg_list_del(&iter->member);
+        free(iter->attrib_name);
+        free(iter);
+    }
 }
