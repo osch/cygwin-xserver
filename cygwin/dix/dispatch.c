@@ -243,8 +243,13 @@ long SmartLastPrint;
 
 void Dispatch(void);
 
+static int*             clientReady;     /* array of request ready clients */
+static int              nready;
+static HWEventQueuePtr* icheck = checkForInput;
+static long             start_tick;
+
 static int
-SmartScheduleClient(int *clientReady, int nready)
+SmartScheduleClient(void/*int *clientReady, int nready*/)
 {
     ClientPtr pClient;
     int i;
@@ -335,16 +340,13 @@ DisableLimitedSchedulingLatency(void)
         SmartScheduleLatencyLimited = 0;
 }
 
-static int*             clientReady;     /* array of request ready clients */
-static int              result;
-static ClientPtr        client;
-static int              nready;
-static HWEventQueuePtr* icheck = checkForInput;
-static long             start_tick;
+void handleNextWindowMessage(void);
 
 int DispatchOneStep(Bool handleWindowMessage)
 {
-    int rslt = 0;
+    ClientPtr client;
+    int       result;
+    int       rslt = 0;
     
         if (*icheck[0] != *icheck[1]) {
             ProcessInputEvents();
@@ -358,7 +360,7 @@ int DispatchOneStep(Bool handleWindowMessage)
             handleNextWindowMessage();
 
         if (nready && !SmartScheduleDisable) {
-            clientReady[0] = SmartScheduleClient(clientReady, nready);
+            clientReady[0] = SmartScheduleClient();
             nready = 1;
         }
        /***************** 

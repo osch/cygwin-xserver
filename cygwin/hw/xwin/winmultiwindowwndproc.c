@@ -295,6 +295,8 @@ winStartMousePolling(winPrivScreenPtr s_pScreenPriv)
                                             MOUSE_POLLING_INTERVAL, NULL);
 }
 
+int DispatchOneStep(Bool handleWindowMessage);
+
 /*
  * winTopLevelWindowProc - Window procedure for all top-level Windows windows.
  */

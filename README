@@ -1,16 +1,10 @@
 # install needed cygwin packages:
-/c/cygwin/setup.exe -q -P autoconf,automake,binutils,bison,bzip2,cygport,diffutils,fileutils,findutils,flex,gawk,gcc,git,libtool,make,patch,pkg-config,sed,tar
-/c/cygwin/setup.exe -q -P bigreqsproto,compositeproto,damageproto,dmxproto,evieext,fixesproto,fontsproto,glproto,inputproto,kbproto,randrproto,recordproto,renderproto,resourceproto,scrnsaverproto,xcmiscproto,xextproto,xineramaproto,xproto,x86bigfontproto
-/c/cygwin/setup.exe -q -P libdmx-devel,libfontenc-devel,libfreetype2-devel,libGL-devel,libpixman1-devel,libX11-devel,libXau-devel,libXaw-devel,libXdmcp-devel,libXext-devel,libXfont-devel,libXinerama-devel,libXmu-devel,libXpm-devel,libXRes-devel,libxkbfile-devel,openssl-devel,zlib
-/c/cygwin/setup.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
-/c/cygwin/setup.exe -q -P libgcrypt-devel,libgcrypt,windowswmproto,font-util
-
-cd xextproto
-./autogen.sh -V
-./configure --prefix=`cd ../install; pwd`
-make
-make install
-cd ..
+/setup-x86_64.exe -q -P autoconf,automake,binutils,bison,bzip2,cygport,diffutils,fileutils,findutils,flex,gawk,gcc,git,libtool,make,patch,pkg-config,sed,tar
+/setup-x86_64.exe -q -P bigreqsproto,compositeproto,damageproto,dmxproto,evieext,fixesproto,fontsproto,glproto,inputproto,kbproto,randrproto,recordproto,renderproto,resourceproto,scrnsaverproto,xcmiscproto,xextproto,xineramaproto,xproto,x86bigfontproto,presentproto
+/setup-x86_64.exe -q -P libdmx-devel,libfontenc-devel,libfreetype2-devel,libGL-devel,libpixman1-devel,libX11-devel,libXau-devel,libXaw-devel,libXdmcp-devel,libXext-devel,libXfont-devel,libXinerama-devel,libXmu-devel,libXpm-devel,libXRes-devel,libxkbfile-devel,openssl-devel,zlib
+/setup-x86_64.exe -q -P font-utils,khronos-opengl-registry,xorg-util-macros,xtrans
+/setup-x86_64.exe -q -P libgcrypt-devel,libgcrypt,windowswmproto,font-util
+/setup-x86_64.exe -q -P libxcb-image-devel,libxcb-icccm-devel
 
 cd libxfont
 ./autogen.sh -V
