@@ -22,7 +22,6 @@ Except as contained in this notice, the name of The Open Group shall not be
 used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from The Open Group.
 
-
 Copyright 1987 by Digital Equipment Corporation, Maynard, Massachusetts.
 
                         All Rights Reserved
@@ -50,6 +49,7 @@ SOFTWARE.
 
 #include "misc.h"
 #include "screenint.h"
+#include "regionstr.h"
 
 /* types for Drawable */
 #define DRAWABLE_WINDOW 0
@@ -71,12 +71,14 @@ SOFTWARE.
 
 #define NullPixmap ((PixmapPtr)0)
 
-typedef struct _Drawable *DrawablePtr;	
+typedef struct _Drawable *DrawablePtr;
 typedef struct _Pixmap *PixmapPtr;
 
+typedef struct _PixmapDirtyUpdate *PixmapDirtyUpdatePtr;
+
 typedef union _PixUnion {
-    PixmapPtr		pixmap;
-    unsigned long	pixel;
+    PixmapPtr pixmap;
+    unsigned long pixel;
 } PixUnion;
 
 #define SamePixUnion(a,b,isPixel)\
@@ -91,29 +93,39 @@ typedef union _PixUnion {
 #define WindowDrawable(type) \
 	((type == DRAWABLE_WINDOW) || (type == UNDRAWABLE_WINDOW))
 
-extern _X_EXPORT PixmapPtr GetScratchPixmapHeader(
-    ScreenPtr /*pScreen*/,
-    int /*width*/,
-    int /*height*/,
-    int /*depth*/,
-    int /*bitsPerPixel*/,
-    int /*devKind*/,
-    pointer /*pPixData*/);
+extern _X_EXPORT PixmapPtr GetScratchPixmapHeader(ScreenPtr /*pScreen */ ,
+                                                  int /*width */ ,
+                                                  int /*height */ ,
+                                                  int /*depth */ ,
+                                                  int /*bitsPerPixel */ ,
+                                                  int /*devKind */ ,
+                                                  pointer /*pPixData */ );
 
-extern _X_EXPORT void FreeScratchPixmapHeader(
-    PixmapPtr /*pPixmap*/);
+extern _X_EXPORT void FreeScratchPixmapHeader(PixmapPtr /*pPixmap */ );
 
-extern _X_EXPORT Bool CreateScratchPixmapsForScreen(
-    int /*scrnum*/);
+extern _X_EXPORT Bool CreateScratchPixmapsForScreen(ScreenPtr /*pScreen */ );
 
-extern _X_EXPORT void FreeScratchPixmapsForScreen(
-    int /*scrnum*/);
+extern _X_EXPORT void FreeScratchPixmapsForScreen(ScreenPtr /*pScreen */ );
 
-extern _X_EXPORT PixmapPtr AllocatePixmap(
-    ScreenPtr /*pScreen*/,
-    int /*pixDataSize*/);
+extern _X_EXPORT PixmapPtr AllocatePixmap(ScreenPtr /*pScreen */ ,
+                                          int /*pixDataSize */ );
 
-extern _X_EXPORT void FreePixmap(
-    PixmapPtr /*pPixmap*/);
+extern _X_EXPORT void FreePixmap(PixmapPtr /*pPixmap */ );
 
-#endif /* PIXMAP_H */
+extern _X_EXPORT PixmapPtr
+PixmapShareToSlave(PixmapPtr pixmap, ScreenPtr slave);
+
+extern _X_EXPORT Bool
+PixmapStartDirtyTracking(PixmapPtr src,
+                         PixmapPtr slave_dst,
+                         int x, int y);
+
+extern _X_EXPORT Bool
+PixmapStopDirtyTracking(PixmapPtr src, PixmapPtr slave_dst);
+
+/* helper function, drivers can do this themselves if they can do it more
+   efficently */
+extern _X_EXPORT Bool
+PixmapSyncDirtyHelper(PixmapDirtyUpdatePtr dirty, RegionPtr dirty_region);
+
+#endif                          /* PIXMAP_H */

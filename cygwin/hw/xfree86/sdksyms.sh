@@ -44,15 +44,20 @@ cat > sdksyms.c << EOF
 /* miext/sync/Makefile.am */
 #include "misync.h"
 #include "misyncstr.h"
+#if HAVE_XSHMFENCE
+#include "misyncshm.h"
+#endif
 
 /* Xext/Makefile.am -- half is module, half is builtin */
-/*
+#ifdef XV
 #include "xvdix.h"
 #include "xvmcext.h"
- */
+#endif
 #include "geext.h"
 #include "geint.h"
+#ifdef MITSHM
 #include "shmint.h"
+#endif
 #include "syncsdk.h"
 #if XINERAMA
 # include "panoramiXsrv.h"
@@ -93,12 +98,11 @@ cat > sdksyms.c << EOF
 
 
 /* hw/xfree86/dri2/Makefile.am -- module */
-/*
 #if DRI2
 # include "dri2.h"
 #endif
- */
 
+# include "dri3.h"
 
 /* hw/xfree86/vgahw/Makefile.am -- module */
 /*
@@ -118,26 +122,24 @@ cat > sdksyms.c << EOF
 #include "xf86.h"
 #include "xf86Module.h"
 #include "xf86Opt.h"
-#include "xf86PciInfo.h"
+#ifdef XSERVER_LIBPCIACCESS
+ #include "xf86VGAarbiter.h"
+#endif
 #include "xf86Priv.h"
 #include "xf86Privstr.h"
 #include "xf86cmap.h"
 #include "xf86fbman.h"
 #include "xf86str.h"
 #include "xf86Xinput.h"
-#include "xf86VGAarbiter.h"
 #include "xisb.h"
 #if XV
 # include "xf86xv.h"
 # include "xf86xvmc.h"
 # include "xf86xvpriv.h"
 #endif
-/* XF86VidMode code is in libextmod module */
-/*
 #if XF86VIDMODE
 # include "vidmodeproc.h"
 #endif
- */
 #include "xorgVersion.h"
 #if defined(__sparc__) || defined(__sparc)
 # include "xf86sbusBus.h"
@@ -170,24 +172,18 @@ cat > sdksyms.c << EOF
 
 
 /* hw/xfree86/os-support/bus/Makefile.am */
-#include "xf86Pci.h"
+#ifdef XSERVER_LIBPCIACCESS
+# include "xf86Pci.h"
+#endif
 #if defined(__sparc__) || defined(__sparc)
 # include "xf86Sbus.h"
 #endif
 
 
-/* hw/xfree86/xaa/Makefile.am -- module */
-/*
-#include "xaa.h"
-#include "xaalocal.h"
-#include "xaarop.h"
- */
-
-
 /* hw/xfree86/dixmods/extmod/Makefile.am -- module */
-/*
+#ifdef XFreeXDGA
 #include "dgaproc.h"
- */
+#endif
 
 
 /* hw/xfree86/parser/Makefile.am */
@@ -203,13 +199,11 @@ cat > sdksyms.c << EOF
 
 
 /* hw/xfree86/dri/Makefile.am -- module */
-/*
 #if XF86DRI
 # include "dri.h"
 # include "sarea.h"
 # include "dristruct.h"
 #endif
- */
 
 
 /* mi/Makefile.am */
@@ -217,7 +211,6 @@ cat > sdksyms.c << EOF
 #include "miline.h"
 #include "mipointer.h"
 #include "mi.h"
-#include "mibstore.h"
 #include "migc.h"
 #include "mipointrst.h"
 #include "mizerarc.h"
@@ -236,9 +229,9 @@ cat > sdksyms.c << EOF
 
 
 /* dbe/Makefile.am -- module */
-/*
+#ifdef DBE
 #include "dbestruct.h"
- */
+#endif
 
 
 /* exa/Makefile.am -- module */
@@ -246,6 +239,9 @@ cat > sdksyms.c << EOF
 #include "exa.h"
  */
 
+#ifdef COMPOSITE
+#include "compositeext.h"
+#endif
 
 /* xfixes/Makefile.am */
 #include "xfixes.h"
@@ -267,11 +263,11 @@ cat > sdksyms.c << EOF
 #include "dixevents.h"
 #include "dixfont.h"
 #include "dixfontstr.h"
+#include "dixfontstubs.h"
 #include "dixgrabs.h"
 #include "dixstruct.h"
 #include "exevents.h"
 #include "extension.h"
-#include "extinit.h"
 #include "extnsionst.h"
 #include "gc.h"
 #include "gcstruct.h"
@@ -319,7 +315,8 @@ topdir=$1
 shift
 LC_ALL=C
 export LC_ALL
-${CPP:-cpp} "$@" -DXorgLoader sdksyms.c | ${AWK:-awk} -v topdir=$topdir '
+${CPP:-cpp} "$@" -DSDKSYMS sdksyms.c > /dev/null || exit $?
+${CPP:-cpp} "$@" -DSDKSYMS sdksyms.c | ${AWK:-awk} -v topdir=$topdir '
 BEGIN {
     sdk = 0;
     print("/*");
@@ -358,7 +355,7 @@ BEGIN {
 	# skip attribute, if any
 	while ($n ~ /^(__attribute__|__global)/ ||
 	    # skip modifiers, if any
-	    $n ~ /^\*?(unsigned|const|volatile|struct)$/ ||
+	    $n ~ /^\*?(unsigned|const|volatile|struct|_X_EXPORT)$/ ||
 	    # skip pointer
 	    $n ~ /^[a-zA-Z0-9_]*\*$/)
 	    n++;
@@ -389,6 +386,9 @@ BEGIN {
 	if ($n == "" || $n ~ /^\*+$/) {
 	    getline;
 	    n = 1;
+	    # indent may have inserted a blank link
+	    if ($0 == "")
+		getline;
 	}
 
 	# dont modify $0 or $n

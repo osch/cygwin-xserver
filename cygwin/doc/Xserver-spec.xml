@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
  "http://www.oasis-open.org/docbook/xml/4.3/docbookx.dtd" [
+ <!ENTITY % xorg-defs SYSTEM "defs.ent"> %xorg-defs;
  <!ENTITY % defs SYSTEM "/xserver/doc/xml/xserver.ent"> %defs;
 ]>
 
 <article>
   <articleinfo>
+    <title>Definition of the Porting Layer for the X v11 Sample Server</title>
+    <titleabbrev>X Porting Layer</titleabbrev>
     <author>
       <firstname>Susan</firstname><surname>Angebranndt</surname>
       <affiliation><orgname>Digital Equipment Corporation</orgname></affiliation>
@@ -39,10 +42,17 @@
       <affiliation><orgname>X.org Foundation and Hewlett Packard</orgname></affiliation>
     </author>
     <publisher><publishername>The X.Org Foundation</publishername></publisher>
+    <releaseinfo>X Version 11, Release &fullrelvers;</releaseinfo>
+    <releaseinfo>X Server Version &xserver.version;</releaseinfo>
+    <copyright><year>1994</year><holder>X Consortium, Inc.</holder></copyright>
+    <copyright><year>2004</year><holder>X.org Foundation, Inc.</holder></copyright>
+    <legalnotice>
+      <para>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ``Software''), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</para>
+      <para>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</para>
+      <para>THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</para>
+      <para>LK201 and DEC are trademarks of Digital Equipment Corporation.  Macintosh and Apple are trademarks of Apple Computer, Inc.  PostScript is a trademark of Adobe Systems, Inc.  Ethernet is a trademark of Xerox Corporation.  X Window System is a trademark of the X.org Foundation, Inc.  Cray is a trademark of Cray Research, Inc.</para>
+    </legalnotice>
     <pubdate>&xserver.reldate;</pubdate>
-    <releaseinfo>X server version &xserver.version;</releaseinfo>
-    <title>Definition of the Porting Layer for the X v11 Sample Server</title>
-    <titleabbrev>X Porting Layer</titleabbrev>
     <revhistory>
       <revision>
 	<revnumber>1.0</revnumber>
@@ -99,14 +109,13 @@
 	<revremark>Revised for Xorg 1.9 devPrivates changes
 	  and 1.8 CreateNewResourceType changes</revremark>
       </revision>
+      <revision>
+	<revnumber>3.6</revnumber>
+	<date>July 2012</date>
+	<authorinitials>kp</authorinitials>
+	<revremark>Revised for X server 1.13 screen-specific devPrivates changes</revremark>
+      </revision>
     </revhistory>
-    <legalnotice>
-      <para>Copyright &#xA9; 1994 X Consortium, Inc., 2004 X.org Foundation, Inc.</para>
-      <para>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the ``Software''), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</para>
-      <para>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</para>
-      <para>THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</para>
-      <para>LK201 and DEC are trademarks of Digital Equipment Corporation.  Macintosh and Apple are trademarks of Apple Computer, Inc.  PostScript is a trademark of Adobe Systems, Inc.  Ethernet is a trademark of Xerox Corporation.  X Window System is a trademark of the X.org Foundation, Inc.  Cray is a trademark of Cray Research, Inc.</para>
-    </legalnotice>
     <abstract>
       <para>The following document explains the structure of the X Window System display server and the interfaces among the larger pieces.  It is intended as a reference for programmers who are implementing an X Display Server on their workstation hardware.  It is included with the X Window System source tape, along with the document "Strategies for Porting the X v11 Sample Server."  The order in which you should read these documents is:
       <orderedlist>
@@ -562,7 +571,7 @@ should be called by InitExtensions.
 	ExtensionEntry *AddExtension(name, NumEvents,NumErrors,
 		MainProc, SwappedMainProc, CloseDownProc, MinorOpcodeProc)
 
-		char *name;  /*Null terminate string; case matters*/
+		const char *name;  /*Null terminate string; case matters*/
 		int NumEvents;
 		int NumErrors;
 		int (* MainProc)(ClientPtr);/*Called if client matches server order*/
@@ -677,7 +686,7 @@ pReadmask is a pointer to the information describing the descriptors
 that will be waited on.
 </para>
 <para>
-In the sample server,  pTimeout is a struct timeval **,  and pReadmask is
+In the sample server,  pTimeout is a pointer,  and pReadmask is
 the address of the select() mask for reading.
 </para>
 <para>
@@ -685,15 +694,14 @@ The DIX BlockHandler() iterates through the Screens,  for each one calling
 its BlockHandler.  A BlockHandler is declared thus:
 <blockquote>
 <programlisting>
-	void xxxBlockHandler(nscreen, pbdata, pptv, pReadmask)
-		int nscreen;
-		pointer pbdata;
-		struct timeval ** pptv;
+	void xxxBlockHandler(pScreen, pTimeout, pReadmask)
+		ScreenPtr pScreen;
+		pointer pTimeout;
 		pointer pReadmask;
 </programlisting>
 </blockquote>
-The arguments are the index of the Screen,  the blockData field
-of the Screen,  and the arguments to the DIX BlockHandler().
+The arguments are a pointer to the Screen, and the arguments to the
+DIX BlockHandler().
 </para>
 <para>
 Immediately after WaitForSomething returns from the
@@ -718,15 +726,14 @@ The DIX WakeupHandler() calls each Screen's
 WakeupHandler.  A WakeupHandler is declared thus:
 <blockquote>
 <programlisting>
-	void xxxWakeupHandler(nscreen, pbdata, err, pReadmask)
-		int nscreen;
-		pointer pbdata;
+	void xxxWakeupHandler(pScreen, result, pReadmask)
+		ScreenPtr pScreen;
 		unsigned long result;
 		pointer pReadmask;
 </programlisting>
 </blockquote>
-The arguments are the index of the Screen,  the blockData field
-of the Screen,  and the arguments to the DIX WakeupHandler().
+The arguments are the Screen, of the Screen, and the arguments to
+the DIX WakeupHandler().
 </para>
 <para>
 In addition to the per-screen BlockHandlers, any module may register
@@ -1321,10 +1328,6 @@ This re-enables X request processing for the specified client.
 
 	void
 	FatalError(char *f, ...)
-
-	void
-	Error(str)
-	    char *str;
 </programlisting></blockquote>
 You should write these three routines to provide for diagnostic output
 from the dix and ddx layers, although implementing them to produce no
@@ -1332,11 +1335,7 @@ output will not affect the correctness of your server.  ErrorF() and
 FatalError() take a printf() type of format specification in the first
 argument and an implementation-dependent number of arguments following
 that.  Normally, the formats passed to ErrorF() and FatalError()
-should be terminated with a newline.  Error() provides an os interface
-for printing out the string passed as an argument followed by a
-meaningful explanation of the last system error.  Normally the string
-does not contain a newline, and it is only called by the ddx layer.
-In the sample implementation, Error() uses the perror() function.
+should be terminated with a newline.
 </para>
 <para>
 After printing the message arguments, FatalError() must be implemented
@@ -1947,18 +1946,15 @@ FALSE.</para>
 The scrInitProc should be of the following form:
 <blockquote><programlisting>
 
-	Bool scrInitProc(iScreen, pScreen, argc, argv)
-		int iScreen;
+	Bool scrInitProc(pScreen, argc, argv)
 		ScreenPtr pScreen;
 		int argc;
 		char **argv;
 </programlisting></blockquote>
-iScreen is the index for this screen; 0 for the first one initialized,
-1 for the second, etc.  pScreen is the pointer to the screen's new
-ScreenRec.  argc and argv are as before.  Your screen initialize
-procedure should return TRUE upon success or FALSE if the screen
-cannot be initialized (for instance, if the screen hardware does not
-exist on this machine).</para>
+pScreen is the pointer to the screen's new ScreenRec. argc and argv
+are as before.  Your screen initialize procedure should return TRUE
+upon success or FALSE if the screen cannot be initialized (for
+ instance, if the screen hardware does not exist on this machine).</para>
 <para>
 This procedure must determine what actual device it is supposed to initialize.
 If you have a different procedure for each screen, then it is no problem.
@@ -4724,7 +4720,8 @@ Two new extensibility concepts have been developed for release 4, Wrappers
 and devPrivates.  These replace the R3 GCInterest queues, which were not a
 general enough mechanism for many extensions and only provided hooks into a
 single data structure.  devPrivates have been revised substantially for
-X.Org X server release 1.5, and updated again for the 1.9 release.</para>
+X.Org X server release 1.5, updated again for the 1.9 release and extended
+again for the 1.13 relealse.</para>
 <section>
   <title>devPrivates</title>
 <para>
@@ -4766,6 +4763,23 @@ function ensures the given <parameter>key</parameter> exists on objects of
 the specified type with distinct storage for the given
 <parameter>pScreen</parameter>. The key is usable on ScreenPrivate variants
 that are otherwise equivalent to the following Private functions.</para>
+
+<para>
+  To request private space in objects created for a specific screen, use
+  <blockquote><programlisting>
+    Bool dixRegisterScreenSpecificPrivateKey(ScreenPtr pScreen, DevPrivateKey key, DevPrivateType type, unsigned size);
+  </programlisting></blockquote>
+  The <parameter>type</parameter> and <parameter>size</parameter> arguments are
+  the same as those to <function>dixRegisterPrivateKey</function> but this
+  function ensures only that the given <parameter>key</parameter> exists on objects of
+  the specified type that are allocated with reference to the specified
+  <parameter>pScreen</parameter>. Using the key on objects allocated for
+  other screens will result in incorrect results; there is no check made to
+  ensure that the caller's screen matches the private's screen. The key is
+  usable in any of the following functions. Screen-specific private storage is available
+  only for Windows, GCs, Pixmaps and Pictures. Attempts to allocate screen-specific
+  privates on other objects will result in a call to FatalError.
+</para>
 
 <para>
 To attach a piece of private data to an object, use:

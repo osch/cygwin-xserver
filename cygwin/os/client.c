@@ -59,6 +59,20 @@
 #include "os.h"
 #include "dixstruct.h"
 
+#ifdef __sun
+#include <errno.h>
+#include <procfs.h>
+#endif
+
+#ifdef __OpenBSD__
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+
+#include <kvm.h>
+#include <limits.h>
+#endif
+
 /**
  * Try to determine a PID for a client from its connection
  * information. This should be called only once when new client has
@@ -71,7 +85,8 @@
  *
  * @see GetClientPid
  */
-pid_t DetermineClientPid(struct _Client *client)
+pid_t
+DetermineClientPid(struct _Client * client)
 {
     LocalClientCredRec *lcc = NULL;
     pid_t pid = -1;
@@ -82,8 +97,7 @@ pid_t DetermineClientPid(struct _Client *client)
     if (client == serverClient)
         return getpid();
 
-    if (GetLocalClientCreds(client, &lcc) != -1)
-    {
+    if (GetLocalClientCreds(client, &lcc) != -1) {
         if (lcc->fieldsSet & LCC_PID_SET)
             pid = lcc->pid;
         FreeLocalClientCreds(lcc);
@@ -113,12 +127,11 @@ pid_t DetermineClientPid(struct _Client *client)
  *
  * @see GetClientCmdName/Args
  */
-void DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
+void
+DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
 {
     char path[PATH_MAX + 1];
     int totsize = 0;
-    int cmdsize = 0;
-    int argsize = 0;
     int fd = 0;
 
     if (cmdname)
@@ -128,6 +141,79 @@ void DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
 
     if (pid == -1)
         return;
+
+#ifdef __sun                    /* Solaris */
+    /* Solaris does not support /proc/pid/cmdline, but makes information
+     * similar to what ps shows available in a binary structure in the
+     * /proc/pid/psinfo file. */
+    if (snprintf(path, sizeof(path), "/proc/%d/psinfo", pid) < 0)
+        return;
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        ErrorF("Failed to open %s: %s\n", path, strerror(errno));
+        return;
+    }
+    else {
+        psinfo_t psinfo = { 0 };
+        char *sp;
+
+        totsize = read(fd, &psinfo, sizeof(psinfo_t));
+        close(fd);
+        if (totsize <= 0)
+            return;
+
+        /* pr_psargs is the first PRARGSZ (80) characters of the command
+         * line string - assume up to the first space is the command name,
+         * since it's not delimited.   While there is also pr_fname, that's
+         * more limited, giving only the first 16 chars of the basename of
+         * the file that was exec'ed, thus cutting off many long gnome
+         * command names, or returning "isapython2.6" for all python scripts.
+         */
+        psinfo.pr_psargs[PRARGSZ - 1] = '\0';
+        sp = strchr(psinfo.pr_psargs, ' ');
+        if (sp)
+            *sp++ = '\0';
+
+        if (cmdname)
+            *cmdname = strdup(psinfo.pr_psargs);
+
+        if (cmdargs && sp)
+            *cmdargs = strdup(sp);
+    }
+#elif defined(__OpenBSD__)
+    /* on OpenBSD use kvm_getargv() */
+    {
+        kvm_t *kd;
+        char errbuf[_POSIX2_LINE_MAX];
+        char **argv;
+        struct kinfo_proc *kp;
+        size_t len = 0;
+        int i, n;
+
+        kd = kvm_open(NULL, NULL, NULL, KVM_NO_FILES, errbuf);
+        if (kd == NULL)
+            return;
+        kp = kvm_getprocs(kd, KERN_PROC_PID, pid, sizeof(struct kinfo_proc),
+                          &n);
+        if (n != 1)
+            return;
+        argv = kvm_getargv(kd, kp, 0);
+        *cmdname = strdup(argv[0]);
+        i = 1;
+        while (argv[i] != NULL) {
+            len += strlen(argv[i]) + 1;
+            i++;
+        }
+        *cmdargs = calloc(1, len);
+        i = 1;
+        while (argv[i] != NULL) {
+            strlcat(*cmdargs, argv[i], len);
+            strlcat(*cmdargs, " ", len);
+            i++;
+        }
+        kvm_close(kd);
+    }
+#else                           /* Linux using /proc/pid/cmdline */
 
     /* Check if /proc/pid/cmdline exists. It's not supported on all
      * operating systems. */
@@ -146,35 +232,31 @@ void DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
     path[totsize - 1] = '\0';
 
     /* Contruct the process name without arguments. */
-    cmdsize = strlen(path) + 1;
-    if (cmdname)
-    {
-        char *name = malloc(cmdsize);
-        if (name)
-        {
-            strncpy(name, path, cmdsize);
-            name[cmdsize - 1] = '\0';
-            *cmdname = name;
-        }
+    if (cmdname) {
+        *cmdname = strdup(path);
     }
 
     /* Construct the arguments for client process. */
-    argsize = totsize - cmdsize;
-    if (cmdargs && (argsize > 0))
-    {
-        char *args = malloc(argsize);
-        if (args)
-        {
+    if (cmdargs) {
+        int cmdsize = strlen(path) + 1;
+        int argsize = totsize - cmdsize;
+        char *args = NULL;
+
+        if (argsize > 0)
+            args = malloc(argsize);
+        if (args) {
             int i = 0;
-            for (i = 0; i < (argsize - 1); ++i)
-            {
+
+            for (i = 0; i < (argsize - 1); ++i) {
                 const char c = path[cmdsize + i];
+
                 args[i] = (c == '\0') ? ' ' : c;
             }
             args[argsize - 1] = '\0';
             *cmdargs = args;
         }
     }
+#endif
 }
 
 /**
@@ -182,7 +264,8 @@ void DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
  *
  * @param[in] client Recently connected client.
  */
-void ReserveClientIds(struct _Client *client)
+void
+ReserveClientIds(struct _Client *client)
 {
 #ifdef CLIENTIDS
     if (client == NullClient)
@@ -195,15 +278,16 @@ void ReserveClientIds(struct _Client *client)
 
     client->clientIds->pid = DetermineClientPid(client);
     if (client->clientIds->pid != -1)
-        DetermineClientCmd(client->clientIds->pid, &client->clientIds->cmdname, &client->clientIds->cmdargs);
+        DetermineClientCmd(client->clientIds->pid, &client->clientIds->cmdname,
+                           &client->clientIds->cmdargs);
 
     DebugF("client(%lx): Reserved pid(%d).\n",
-           client->clientAsMask, client->clientIds->pid);
+           (unsigned long) client->clientAsMask, client->clientIds->pid);
     DebugF("client(%lx): Reserved cmdname(%s) and cmdargs(%s).\n",
-           client->clientAsMask,
+           (unsigned long) client->clientAsMask,
            client->clientIds->cmdname ? client->clientIds->cmdname : "NULL",
            client->clientIds->cmdargs ? client->clientIds->cmdargs : "NULL");
-#endif /* CLIENTIDS */
+#endif                          /* CLIENTIDS */
 }
 
 /**
@@ -212,7 +296,8 @@ void ReserveClientIds(struct _Client *client)
  *
  * @param[in] client Recently disconnected client.
  */
-void ReleaseClientIds(struct _Client *client)
+void
+ReleaseClientIds(struct _Client *client)
 {
 #ifdef CLIENTIDS
     if (client == NullClient)
@@ -222,17 +307,17 @@ void ReleaseClientIds(struct _Client *client)
         return;
 
     DebugF("client(%lx): Released pid(%d).\n",
-           client->clientAsMask, client->clientIds->pid);
+           (unsigned long) client->clientAsMask, client->clientIds->pid);
     DebugF("client(%lx): Released cmdline(%s) and cmdargs(%s).\n",
-           client->clientAsMask,
+           (unsigned long) client->clientAsMask,
            client->clientIds->cmdname ? client->clientIds->cmdname : "NULL",
            client->clientIds->cmdargs ? client->clientIds->cmdargs : "NULL");
 
-    free((void *) client->clientIds->cmdname); /* const char * */
-    free((void *) client->clientIds->cmdargs); /* const char * */
+    free((void *) client->clientIds->cmdname);  /* const char * */
+    free((void *) client->clientIds->cmdargs);  /* const char * */
     free(client->clientIds);
     client->clientIds = NULL;
-#endif /* CLIENTIDS */
+#endif                          /* CLIENTIDS */
 }
 
 /**
@@ -247,7 +332,8 @@ void ReleaseClientIds(struct _Client *client)
  *
  * @see DetermineClientPid
  */
-pid_t GetClientPid(struct _Client *client)
+pid_t
+GetClientPid(struct _Client *client)
 {
     if (client == NullClient)
         return -1;
@@ -272,7 +358,8 @@ pid_t GetClientPid(struct _Client *client)
  *
  * @see DetermineClientCmd
  */
-const char *GetClientCmdName(struct _Client *client)
+const char *
+GetClientCmdName(struct _Client *client)
 {
     if (client == NullClient)
         return NULL;
@@ -297,7 +384,8 @@ const char *GetClientCmdName(struct _Client *client)
  *
  * @see DetermineClientCmd
  */
-const char *GetClientCmdArgs(struct _Client *client)
+const char *
+GetClientCmdArgs(struct _Client *client)
 {
     if (client == NullClient)
         return NULL;

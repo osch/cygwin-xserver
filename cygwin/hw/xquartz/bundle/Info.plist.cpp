@@ -19,12 +19,14 @@
 	<key>CFBundlePackageType</key>
 		<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-		<string>2.7.0</string>
+		<string>2.7.6</string>
 	<key>CFBundleVersion</key>
-		<string>2.7.0</string>
+		<string>2.7.6</string>
 	<key>CFBundleSignature</key>
 		<string>x11a</string>
 	<key>CSResourcesFileMapped</key>
+		<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
 		<true/>
 #ifdef XQUARTZ_SPARKLE
 	<key>SUEnableAutomaticChecks</key>
@@ -37,9 +39,9 @@
 	<key>LSApplicationCategoryType</key>
 		<string>public.app-category.utilities</string>
 	<key>NSHumanReadableCopyright</key>
-		<string>© 2003-2011 Apple Inc.
+		<string>© 2003-2013 Apple Inc.
 © 2003 XFree86 Project, Inc.
-© 2003-2011 X.org Foundation, Inc.
+© 2003-2013 X.org Foundation, Inc.
 </string>
 	<key>NSMainNibFile</key>
 		<string>main</string>

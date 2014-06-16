@@ -22,7 +22,6 @@ Except as contained in this notice, the name of The Open Group shall not be
 used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from The Open Group.
 
-
 Copyright 1987 by Digital Equipment Corporation, Maynard, Massachusetts.
 
                         All Rights Reserved
@@ -52,18 +51,43 @@ SOFTWARE.
 
 typedef struct _PixmapFormat *PixmapFormatPtr;
 typedef struct _Visual *VisualPtr;
-typedef struct _Depth  *DepthPtr;
+typedef struct _Depth *DepthPtr;
 typedef struct _Screen *ScreenPtr;
 
-extern _X_EXPORT int AddScreen(
-    Bool (* /*pfnInit*/)(
-	int /*index*/,
-	ScreenPtr /*pScreen*/,
-	int /*argc*/,
-	char ** /*argv*/),
-    int /*argc*/,
-    char** /*argv*/);
+extern _X_EXPORT int AddScreen(Bool (* /*pfnInit */ )(
+                                                         ScreenPtr /*pScreen */
+                                                         ,
+                                                         int /*argc */ ,
+                                                         char ** /*argv */ ),
+                               int /*argc */ ,
+                               char ** /*argv */ );
+
+
+extern _X_EXPORT int AddGPUScreen(Bool (*pfnInit) (ScreenPtr /*pScreen */ ,
+                                                   int /*argc */ ,
+                                                   char **      /*argv */
+                                                   ),
+                                  int argc, char **argv);
+
+extern _X_EXPORT void RemoveGPUScreen(ScreenPtr pScreen);
+
+extern _X_EXPORT void
+AttachUnboundGPU(ScreenPtr pScreen, ScreenPtr newScreen);
+extern _X_EXPORT void
+DetachUnboundGPU(ScreenPtr unbound);
+
+extern _X_EXPORT void
+AttachOutputGPU(ScreenPtr pScreen, ScreenPtr newScreen);
+
+extern _X_EXPORT void
+DetachOutputGPU(ScreenPtr output);
+
+extern _X_EXPORT void
+AttachOffloadGPU(ScreenPtr pScreen, ScreenPtr newScreen);
+
+extern _X_EXPORT void
+DetachOffloadGPU(ScreenPtr slave);
 
 typedef struct _ColormapRec *ColormapPtr;
 
-#endif /* SCREENINT_H */
+#endif                          /* SCREENINT_H */

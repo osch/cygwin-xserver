@@ -50,3 +50,5 @@ EXTRA_DIST = \
 sdk_HEADERS = \
 	xf86Parser.h \
 	xf86Optrec.h
+
+AM_CPPFLAGS = -I$(srcdir)/../common

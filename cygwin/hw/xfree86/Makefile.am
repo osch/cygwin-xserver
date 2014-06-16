@@ -1,18 +1,21 @@
 
 if DRI
 DRI_SUBDIR = dri
+DRI_LIB = dri/libdri.la
 endif
 
 if DRI2
 DRI2_SUBDIR = dri2
+DRI2_LIB = dri2/libdri2.la
+endif
+
+if DRI3
+DRI3_BUILDDIR = $(top_builddir)/dri3
+DRI3_LIB = $(DRI3_BUILDDIR)/libdri3.la
 endif
 
 if XF86UTILS
 XF86UTILS_SUBDIR = utils
-endif
-
-if XAA
-XAA_SUBDIR = xaa
 endif
 
 if VGAHW
@@ -27,13 +30,13 @@ if INT10MODULE
 INT10_SUBDIR = int10
 endif
 
-SUBDIRS = common ddc i2c x86emu $(INT10_SUBDIR) fbdevhw os-support parser \
-	  ramdac shadowfb $(VBE_SUBDIR) $(VGAHW_SUBDIR) $(XAA_SUBDIR) \
-	  loader dixmods exa modes \
-	  $(DRI_SUBDIR) $(DRI2_SUBDIR) $(XF86UTILS_SUBDIR) doc man
+SUBDIRS = common ddc x86emu $(INT10_SUBDIR) os-support parser \
+	  ramdac $(VGAHW_SUBDIR) loader modes $(DRI_SUBDIR) \
+	  $(DRI2_SUBDIR) . $(VBE_SUBDIR) i2c dixmods \
+	  fbdevhw shadowfb exa $(XF86UTILS_SUBDIR) doc man
 
 DIST_SUBDIRS = common ddc i2c x86emu int10 fbdevhw os-support \
-               parser ramdac shadowfb vbe vgahw xaa \
+               parser ramdac shadowfb vbe vgahw \
                loader dixmods dri dri2 exa modes \
 	       utils doc man
 
@@ -41,8 +44,9 @@ bin_PROGRAMS = Xorg
 nodist_Xorg_SOURCES = sdksyms.c
 
 AM_CFLAGS = $(DIX_CFLAGS) @XORG_CFLAGS@
-INCLUDES = $(XORG_INCS) -I$(srcdir)/parser -I$(top_srcdir)/miext/cw \
-	-I$(srcdir)/ddc -I$(srcdir)/i2c -I$(srcdir)/modes -I$(srcdir)/ramdac
+AM_CPPFLAGS = $(XORG_INCS) -I$(srcdir)/parser -I$(top_srcdir)/miext/cw \
+	-I$(srcdir)/ddc -I$(srcdir)/i2c -I$(srcdir)/modes -I$(srcdir)/ramdac \
+	-I$(srcdir)/dri -I$(srcdir)/dri2 -I$(top_srcdir)/dri3
 
 LOCAL_LIBS = \
             $(MAIN_LIB) \
@@ -56,8 +60,12 @@ LOCAL_LIBS = \
             ramdac/libramdac.la \
             ddc/libddc.la \
             i2c/libi2c.la \
-            dixmods/libxorgxkb.la \
             $(XORG_LIBS) \
+            dixmods/libxorgxkb.la \
+            $(DRI_LIB) \
+            $(DRI2_LIB) \
+	    $(DRI3_LIB) \
+	    $(top_builddir)/miext/sync/libsync.la \
             $(top_builddir)/mi/libmi.la \
             $(top_builddir)/os/libos.la
 Xorg_LDADD = \
@@ -72,28 +80,27 @@ BUILT_SOURCES = xorg.conf.example
 DISTCLEANFILES = xorg.conf.example
 EXTRA_DIST = xorgconf.cpp
 
-if SOLARIS_ASM_INLINE
-# Needs to be built before any files are compiled when using Sun compilers
-# so in*/out* inline definitions are properly processed.
-
-BUILT_SOURCES += os-support/solaris/solaris-@SOLARIS_INOUT_ARCH@.il
-
-os-support/solaris/solaris-@SOLARIS_INOUT_ARCH@.il:
-	cd os-support/solaris ; \
-	 $(MAKE) $(AM_MAKEFLAGS) solaris-@SOLARIS_INOUT_ARCH@.il
+# Without logdir, X will post an error on the terminal and will not start
+install-data-local:
+	$(AM_V_GEN)$(MKDIR_P) $(DESTDIR)$(logdir)
+if CYGWIN
+	$(INSTALL_DATA) libXorg.exe.a $(DESTDIR)$(libdir)/libXorg.exe.a
 endif
 
-# do not use $(mkdir_p) if you want automake 1.7 to work
-install-data-local:
-	mkdir -p $(DESTDIR)$(logdir)
-
-
-install-exec-local: install-binPROGRAMS
-	(cd $(DESTDIR)$(bindir) && rm -f X && ln -s Xorg X)
+install-exec-hook:
+	(cd $(DESTDIR)$(bindir) && rm -f X && $(LN_S) Xorg$(EXEEXT) X)
 if INSTALL_SETUID
 	chown root $(DESTDIR)$(bindir)/Xorg
 	chmod u+s $(DESTDIR)$(bindir)/Xorg
 endif
+
+uninstall-local:
+if CYGWIN
+	$(AM_V_at)rm -f $(DESTDIR)$(libdir)/libXorg.exe.a
+endif
+
+uninstall-hook:
+	$(AM_V_at)rm -f $(DESTDIR)$(bindir)/X
 
 # Use variables from XORG_MANPAGE_SECTIONS and X Server configuration
 # Do not include manpages.am as values are not appropriate for rc files
@@ -105,13 +112,22 @@ xorg.conf.example: xorgconf.cpp
 	$(AM_V_GEN)$(SED) $(CONF_SUBSTS) < $(srcdir)/xorgconf.cpp > $@
 
 relink:
-	$(AM_V_at)rm -f Xorg && $(MAKE) Xorg
+	$(AM_V_at)rm -f Xorg$(EXEEXT) && $(MAKE) Xorg$(EXEEXT)
 
 CLEANFILES = sdksyms.c sdksyms.dep
 EXTRA_DIST += sdksyms.sh
 
 sdksyms.dep sdksyms.c: sdksyms.sh
-	CPP='$(CPP)' AWK='$(AWK)' $(srcdir)/sdksyms.sh $(top_srcdir) $(CFLAGS) $(AM_CFLAGS) $(INCLUDES)
+	$(AM_V_GEN)CPP='$(CPP)' AWK='$(AWK)' $(SHELL) $(srcdir)/sdksyms.sh $(top_srcdir) $(CFLAGS) $(AM_CFLAGS) $(AM_CPPFLAGS)
 
 SDKSYMS_DEP = sdksyms.dep
 include $(SDKSYMS_DEP)
+
+i2c/libi2c.la:
+	$(AM_V_at)cd i2c && $(MAKE) libi2c.la
+
+dixmods/libdixmods.la:
+	$(AM_V_at)cd dixmods && $(MAKE) libdixmods.la
+
+dixmods/libxorgxkb.la:
+	$(AM_V_at)cd dixmods && $(MAKE) libxorgxkb.la

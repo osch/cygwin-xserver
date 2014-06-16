@@ -7,28 +7,27 @@ noinst_LTLIBRARIES = libglx.la $(GLXDRI_LIBRARY)
 AM_CFLAGS = \
 	@DIX_CFLAGS@ \
 	@GL_CFLAGS@ \
-	@DRI_CFLAGS@ \
 	@XLIB_CFLAGS@ \
 	@LIBDRM_CFLAGS@ \
-	@DRIPROTO_CFLAGS@ \
 	@GLX_DEFINES@ \
 	@GLX_ARCH_DEFINES@
 
 # none yet
 #sdk_HEADERS =
 
-INCLUDES = \
+AM_CPPFLAGS = \
 	-I$(top_srcdir)/hw/xfree86/os-support \
 	-I$(top_srcdir)/hw/xfree86/os-support/bus \
 	-I$(top_srcdir)/hw/xfree86/common \
 	-I$(top_srcdir)/hw/xfree86/dri \
-	-I$(top_srcdir)/mi
+	-I$(top_srcdir)/mi \
+	-I$(top_srcdir)/present
 
 if DRI2_AIGLX
-INCLUDES += -I$(top_srcdir)/hw/xfree86/dri2
+AM_CPPFLAGS += -I$(top_srcdir)/hw/xfree86/dri2
 endif
 
-glapi_sources =					\
+indirect_sources =				\
 	indirect_dispatch.c			\
 	indirect_dispatch.h			\
 	indirect_dispatch_swap.c		\
@@ -37,19 +36,9 @@ glapi_sources =					\
 	indirect_size.h				\
 	indirect_size_get.c			\
 	indirect_size_get.h			\
-	indirect_table.c			\
-	dispatch.h				\
-	glapitable.h				\
-	glapi.h					\
-	glapi_gentable.c			\
-	glapioffsets.h				\
-	glthread.h
+	indirect_table.c
 
 libglxdri_la_SOURCES =
-
-if DRI
-libglxdri_la_SOURCES += glxdri.c
-endif
 
 if DRI2_AIGLX
 libglxdri_la_SOURCES += glxdri2.c
@@ -59,7 +48,8 @@ libglxdri_la_LIBADD = $(DLOPEN_LIBS)
 
 libglx_la_SOURCES = \
 	$(indirect_sources) \
-	$(glapi_sources) \
+	clientinfo.c \
+	createcontext.c \
 	extension_string.c \
 	extension_string.h \
 	indirect_util.c \
