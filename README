@@ -6,6 +6,14 @@
 /setup-x86_64.exe -q -P libgcrypt-devel,libgcrypt,windowswmproto,font-util
 /setup-x86_64.exe -q -P libxcb-image-devel,libxcb-icccm-devel
 
+# Install also python3 and lxml for python3.
+# the following link is necessary for python3:
+ln -s /usr/include /include
+
+# modify /usr/share/opengl/api/gl.xml according to http://permalink.gmane.org/gmane.os.cygwin.xfree/23199
+# (remove GLenum-target from glTexturePageCommitmentEXT)
+
+
 cd libxfont
 ./autogen.sh -V
 ./configure --prefix=`cd ../install; pwd` --disable-shared
@@ -25,7 +33,7 @@ cd ../../..
 cd cygwin
 export PKG_CONFIG_PATH=`cd ../install/lib/pkgconfig; pwd`:$PKG_CONFIG_PATH
 ./autogen.sh -V
-./configure --prefix=/usr --with-log-dir=/var/log                                --disable-dmx --disable-kdrive --disable-xephyr --disable-xfake --disable-xfbdev --disable-xnest --disable-xvfb --enable-xwin --disable-config-hal --disable-config-udev --disable-dri --disable-dri2 --disable-install-setuid --enable-windowswm --disable-xf86bigfont --disable-xf86vidmode --disable-xv --disable-xvmc --disable-glx-tls --disable-glx --disable-aiglx --with-sha1=libgcrypt --disable-unit-tests
+./configure --prefix=/usr --with-log-dir=/var/log     --disable-xvfb --disable-xnest       --enable-xwin --enable-windowswm --with-sha1=libgcrypt --disable-unit-tests --enable-static
 make
 hw/xwin/XWin :1 -ac -silent-dup-error -multiwindow -xkbvariant nodeadkeys -emulate3buttons
 
