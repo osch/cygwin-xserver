@@ -35,7 +35,7 @@
  */
 
 typedef struct {
-    long flags;                 /* marks which fields in this structure are defined */
+    int  flags;                 /* marks which fields in this structure are defined */
     Bool input;                 /* does this application rely on the window manager to
                                    get keyboard input? */
     int initial_state;          /* see below */
@@ -63,7 +63,7 @@ typedef struct {
  * used with WM_NORMAL_HINTS.
  */
 typedef struct {
-    long flags;                 /* marks which fields in this structure are defined */
+    int flags;                  /* marks which fields in this structure are defined */
     int x, y;                   /* obsolete for new window mgrs, but clients */
     int width, height;          /* should set so old wm's don't mess up */
     int min_width, min_height;
