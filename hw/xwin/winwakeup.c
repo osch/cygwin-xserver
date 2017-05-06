@@ -40,6 +40,25 @@
 void
 winWakeupHandler(ScreenPtr pScreen, int iResult)
 {
+    /* was: handleNextWindowMessage, but
+            this will block in WaitForSomething when
+            moving resizing windows in multiwindow 
+            mode. */
+    MSG msg;
+
+    /* Process one message from our queue */
+    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        if ((g_hDlgDepthChange == 0
+             || !IsDialogMessage(g_hDlgDepthChange, &msg))
+            && (g_hDlgExit == 0 || !IsDialogMessage(g_hDlgExit, &msg))
+            && (g_hDlgAbout == 0 || !IsDialogMessage(g_hDlgAbout, &msg))) {
+            DispatchMessage(&msg);
+        }
+    }
+}
+
+void handleNextWindowMessage(void)
+{
     MSG msg;
 
     /* Process one message from our queue */

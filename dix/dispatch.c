@@ -404,27 +404,30 @@ DisableLimitedSchedulingLatency(void)
         SmartScheduleLatencyLimited = 0;
 }
 
-void
-Dispatch(void)
+// in hw/xwin/winwakeup.c
+void handleNextWindowMessage(void);
+
+int DispatchOneStep(Bool handleWindowMessage)
 {
     int result;
     ClientPtr client;
     long start_tick;
+    int rslt = 0;
 
-    nextFreeClientID = 1;
-    nClients = 0;
-
-    SmartScheduleSlice = SmartScheduleInterval;
-    init_client_ready();
-
-    while (!dispatchException) {
         if (InputCheckPending()) {
             ProcessInputEvents();
             FlushIfCriticalOutputPending();
         }
-
-        if (!WaitForSomething(clients_are_ready()))
-            continue;
+        rslt = WaitForSomething(clients_are_ready());
+        
+        if (handleWindowMessage) {
+            //handleNextWindowMessage();
+        }
+        if (!rslt) {
+            return rslt;
+        }
+        //if (!WaitForSomething(clients_are_ready()))
+        //    continue;
 
        /*****************
 	*  Handle events in round robin fashion, doing input between
@@ -509,6 +512,19 @@ Dispatch(void)
                 client->smart_stop_tick = SmartScheduleTime;
         }
         dispatchException &= ~DE_PRIORITYCHANGE;
+    return rslt;
+}
+
+void
+Dispatch(void)
+{
+    nextFreeClientID = 1;
+    nClients = 0;
+
+    SmartScheduleSlice = SmartScheduleInterval;
+    init_client_ready();
+    while (!dispatchException) {
+        DispatchOneStep(TRUE);
     }
 #if defined(DDXBEFORERESET)
     ddxBeforeReset();
